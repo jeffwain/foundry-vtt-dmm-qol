@@ -1,0 +1,48 @@
+/* Row spacing and footer roll links for dnd5e's group roll request card. */
+
+:where(.chat-card) {
+  /* ── Group Rolls - Rows ────────────────────────────────────────────────── */
+  /* Padding replaces the list gap to capture clicks */
+  ul.action-list:has(.dmm-group-roll-row) {
+    gap: 0;
+
+    li {
+      padding-block-end: 0.25rem;
+    }
+  }
+
+  /* ── Group Rolls - Footer ──────────────────────────────────────────────── */
+  /* Plain gold icon and text, not full buttons. */
+  .dmm-group-roll-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      inline-size: auto;
+      block-size: auto;
+      margin: 0;
+      padding: 0;
+      border: none;
+      background: none;
+      box-shadow: none;
+      color: var(--dnd5e-color-gold);
+      font-family: var(--dnd5e-font-roboto-condensed);
+      font-weight: 500;
+      line-height: normal;
+
+      &:not(:disabled):is(:hover, :focus-visible) {
+        background: none;
+        box-shadow: none;
+        text-shadow: 0 0 6px var(--dnd5e-color-gold);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+      }
+    }
+  }
+}

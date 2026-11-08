@@ -1,0 +1,15 @@
+{
+  "name": "dmm-quality-of-life",
+  "private": true,
+  "type": "module",
+  "description": "Foundry VTT module. Tests cover the pure helpers only; Foundry-coupled code is verified in-app.",
+  "scripts": {
+    "test": "node --test \"scripts/**/*.test.js\" \"tools/**/*.test.js\"",
+    "vendor": "node tools/vendor.js",
+    "build": "node tools/build.js",
+    "verify": "node tools/vendor.js --check && npm test"
+  },
+  "dependencies": {
+    "fuse.js": "7.5.0"
+  }
+}

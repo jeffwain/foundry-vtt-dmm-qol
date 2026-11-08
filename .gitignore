@@ -1,0 +1,9 @@
+# Dependencies and release build output (npm run build)
+node_modules/
+dist/
+
+# Foundry writes this while the module folder is in use
+/dmm-quality-of-life.lock
+
+# Local working notes, not shipped
+docs/

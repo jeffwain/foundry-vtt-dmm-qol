@@ -1,0 +1,195 @@
+/* The Settings pane sidebar tab, docked or popped out. */
+
+:where(.dmm-settings-pane) {
+  /* ── Settings Pane - Layout ────────────────────────────────────────────── */
+  /* Docked, the tab itself holds the content; core hides it unless .active.
+     Popped out, the content sits in the window frame's .window-content. */
+  &:where(.active),
+  .window-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    overflow: hidden;
+  }
+
+  .dmm-settings-pane-search {
+    display: flex;
+    flex: none;
+    gap: 0.25rem;
+
+  }
+
+  /* ── Settings Pane - Search Field ──────────────────────────────────────── */
+  /* The clear button sits inside the input's end edge; the browser's own clear mark is hidden. */
+  .dmm-settings-pane-search-field {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-inline-size: 0;
+
+    input {
+      flex: 1;
+      min-inline-size: 0;
+      padding-inline-end: 1.75rem;
+
+      &::-webkit-search-cancel-button {
+        appearance: none;
+      }
+    }
+  }
+
+  .dmm-settings-pane-clear {
+    --button-size: 1.5rem;
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-text-color: var(--color-text-subtle);
+    --button-hover-background-color: transparent;
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-text-emphatic);
+
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0.25rem;
+    inline-size: var(--button-size);
+    margin-block: auto;
+    padding: 0;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  /* ── Settings Pane - Search Buttons ────────────────────────────────────── */
+  /* Edit button turns on the module switches and disabled modules; save and cancel replace it while changes are staged. */
+  :is(.dmm-settings-pane-edit, .dmm-settings-pane-save, .dmm-settings-pane-cancel, .dmm-settings-pane-toggle) {
+    --button-size: 2rem;
+
+    flex: none;
+    inline-size: var(--button-size);
+    padding: 0;
+  }
+
+  .dmm-settings-pane-edit[aria-pressed="true"] {
+    --button-background-color: color-mix(in oklab, var(--color-text-primary) 18%, transparent);
+  }
+
+  .dmm-settings-pane-list {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-block-size: 0;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+  }
+
+  /* ── Settings Pane - Module Blocks ─────────────────────────────────────── */
+  /* Each module is one soft block: its name as the header, its menus beneath.
+     Core's button rules live in @layer, so setting its --button-* tokens here wins. */
+  .dmm-settings-pane-category {
+    --pane-tint: color-mix(in oklab, var(--color-text-primary) 6%, transparent);
+    --pane-tint-hover: color-mix(in oklab, var(--color-text-primary) 12%, transparent);
+
+    display: flex;
+    flex-direction: column;
+    margin-block: 0;
+    padding: 0.25rem;
+    border-radius: 6px;
+    background: var(--pane-tint);
+  }
+
+  :is(.dmm-settings-pane-open, .dmm-settings-pane-menu) {
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-hover-background-color: var(--pane-tint-hover);
+    --button-hover-border-color: transparent;
+    --button-hover-text-color: var(--color-text-emphatic);
+
+    justify-content: start;
+    transition: background-color 0.15s;
+  }
+
+  /* ── Settings Pane - Module Header ─────────────────────────────────────── */
+  .dmm-settings-pane-open {
+    --button-size: 1.75rem;
+    --button-text-color: var(--color-text-emphatic);
+
+    font-size: var(--font-size-14);
+    font-weight: bold;
+
+    span:first-child {
+      flex: 1;
+      text-align: start;
+    }
+  }
+
+  .dmm-settings-pane-header {
+    display: flex;
+    align-items: center;
+
+    .dmm-settings-pane-open {
+      flex: 1;
+      min-inline-size: 0;
+    }
+  }
+
+  /* A disabled module has no settings to open, so its name is plain text. */
+  .dmm-settings-pane-title {
+    flex: 1;
+    padding-inline: var(--spacer-8, 0.5rem);
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-14);
+    font-weight: bold;
+  }
+
+  .dmm-settings-pane-count {
+    color: var(--color-text-subtle);
+    font-size: var(--font-size-12);
+    font-weight: normal;
+  }
+
+  /* ── Settings Pane - Menus ─────────────────────────────────────────────── */
+  .dmm-settings-pane-menu {
+    --button-size: 1.5rem;
+
+    font-size: var(--font-size-12);
+
+    i {
+      flex: none;
+      inline-size: 1.25em;
+      color: var(--color-text-subtle);
+      text-align: center;
+    }
+
+    &:hover i {
+      color: inherit;
+    }
+  }
+
+  /* ── Settings Pane - Module Toggle ─────────────────────────────────────── */
+  /* On/off switch in a module's header. A dashed outline marks a staged change; disabled modules are dimmed. */
+  .dmm-settings-pane-toggle {
+    --button-background-color: transparent;
+    --button-border-color: transparent;
+    --button-hover-background-color: var(--pane-tint-hover);
+    --button-hover-border-color: transparent;
+    --button-text-color: var(--color-text-subtle);
+    --button-hover-text-color: var(--color-text-emphatic);
+
+    &[aria-pressed="true"] {
+      --button-text-color: var(--color-text-emphatic);
+    }
+  }
+
+  .dmm-settings-pane-category[data-state="off"] {
+    opacity: 0.75;
+  }
+
+  .dmm-settings-pane-category[data-pending] {
+    outline: 1px dashed var(--color-text-subtle);
+    outline-offset: -1px;
+  }
+}

@@ -1,0 +1,25 @@
+/* Small visual tweaks. Everything here only applies while the CSS Tweaks
+   setting is on (it adds .dmm-css-tweaks to <body>). */
+
+:where(body.dmm-css-tweaks) {
+  #sidebar-content {
+    .chat-sidebar .chat-form {
+      gap: 0.25rem;
+
+      .dice-tray {
+        margin-block-start: 0;
+      }
+    }
+  }
+
+  #chat-message {
+    gap: 0.25rem 0;
+
+    .menu-container {
+      --menu-height: 2rem;
+    }
+    .chat-sidebar .chat-input menu {
+      --menu-padding: 0;
+    }
+  }
+}

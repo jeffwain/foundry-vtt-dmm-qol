@@ -1,0 +1,93 @@
+/* ── Sidebar Tabs — hidden tab class (applied to live sidebar) ───────────── */
+#sidebar .dmm-st-hidden {
+  display: none !important;
+}
+
+/* ── Scene Controls — hidden button class ───────────────────────────────── */
+:where(#scene-controls-layers) .dmm-st-hidden {
+  display: none;
+}
+
+/* ── Sidebar Tabs config dialog ──────────────────────────────────────────── */
+/* Shared by the Sidebar Tabs and Scene Controls dialogs. */
+:is(#dmm-sidebar-tabs, #dmm-scene-controls) {
+  .dmm-st-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 8px 0;
+  }
+
+  .dmm-st-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 4px;
+  }
+
+  .dmm-st-row:hover {
+    background: rgba(0, 0, 0, 0.05);
+  }
+
+  .dmm-st-label {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .dmm-st-label input[type="checkbox"] {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .dmm-st-label i {
+    flex: 0 0 1.2em;
+    text-align: center;
+    opacity: 0.8;
+  }
+
+  .dmm-st-label span {
+    flex: 1;
+  }
+
+  /* Drag handle at the end of each row */
+  .dmm-st-grip {
+    flex: 0 0 auto;
+    padding-inline: 6px;
+    opacity: 0.6;
+    cursor: grab;
+  }
+
+  .dmm-st-grip:hover,
+  .dmm-st-grip:focus-visible {
+    opacity: 1;
+  }
+
+  .dmm-st-dragging {
+    opacity: 0.4;
+  }
+
+  /* Locked row: the button that can't be hidden or moved */
+  .dmm-st-locked .dmm-st-label {
+    color: var(--color-text-subtle);
+    cursor: default;
+  }
+
+  .dmm-st-lock {
+    flex: 0 0 auto;
+    padding-inline: 6px;
+    opacity: 0.4;
+  }
+
+  /* Keep the locked row as close to the list as the rows inside it */
+  .dmm-st-locked + .dmm-st-list {
+    margin-block-start: 2px;
+  }
+
+  .dmm-st-list:has(+ .dmm-st-locked) {
+    margin-block-end: 2px;
+  }
+}

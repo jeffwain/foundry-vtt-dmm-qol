@@ -1,0 +1,72 @@
+/* Chrome for the in-game Fonts dialog. */
+
+:where(#dmm-fonts) {
+  /* ── Fonts Dialog - Folder ─────────────────────────────────────────────── */
+  .dmm-fonts-inline {
+    flex: none;
+    inline-size: auto;
+    padding-inline: 0.6rem;
+  }
+
+  /* ── Fonts Dialog - Scrolling Lists ────────────────────────────────────── */
+  /* 30rem is 480px at the default root size; long lists scroll past it. */
+  .dmm-fonts-scroll {
+    max-block-size: 30rem;
+    overflow-y: auto;
+  }
+
+  /* ── Fonts Dialog - Font Files ─────────────────────────────────────────── */
+  .dmm-fonts-files-group > label {
+    display: block;
+    margin-block-end: 0.3rem;
+    font-weight: 700;
+  }
+
+  .dmm-fonts-files {
+    display: flex;
+    flex-direction: column;
+    padding-block: 0.25rem;
+    padding-inline: 0.5rem;
+    border: 0.0625rem solid var(--color-border-light-tertiary, #7a7971);
+    border-radius: 0.25rem;
+  }
+
+  .dmm-fonts-file {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-block-size: 2.25rem;
+    cursor: pointer;
+
+    input {
+      flex: none;
+    }
+
+    span {
+      overflow: hidden;
+      font-size: 1.25rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  /* The All toggle reads as a control, not a font sample. */
+  .dmm-fonts-all {
+    border-block-end: 0.0625rem solid var(--color-border-light-tertiary, #7a7971);
+
+    span {
+      font-size: inherit;
+    }
+  }
+
+  /* ── Fonts Dialog - Footer ─────────────────────────────────────────────── */
+  .dmm-fonts-footer {
+    justify-content: space-between;
+
+    button {
+      flex: none;
+      inline-size: auto;
+      padding-inline: 0.9rem;
+    }
+  }
+}

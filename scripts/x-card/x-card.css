@@ -1,0 +1,100 @@
+/* The X-Card overlay, shown full screen when anyone presses the button. */
+
+:where(#dmm-x-card) {
+  /* ── X-Card - Tokens ───────────────────────────────────────────────────── */
+  --x-card-color: oklch(0.99 0 0);
+  --x-card-red: var(--dnd5e-color-maroon, #741b2b);
+  --x-card-shadow: oklch(0 0 0 / 0.45);
+  --x-card-scrim: oklch(0.15 0.01 27 / 0.25);
+  --x-card-size: min(35vh, 35vw);
+
+  /* ── X-Card - Overlay ──────────────────────────────────────────────────── */
+  /* Above Foundry's windows and notifications. The wide ellipse echoes core's
+     #pause band, but fades out top and bottom as well as at the sides. */
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  grid-template-areas: "card";
+  place-items: center;
+  background:
+    radial-gradient(closest-side, oklch(from var(--x-card-red) l c h / 0.6), transparent),
+    radial-gradient(70% 35% at center, oklch(from var(--x-card-red) l c h / 0.4), transparent),
+    var(--x-card-scrim);
+  cursor: pointer;
+  outline: none;
+  animation: x-card-fade-in 300ms ease-out;
+
+  /* Blur only a soft circle behind the X, fading out at its edge. */
+  &::before {
+    content: "";
+    grid-area: card;
+    inline-size: calc(var(--x-card-size) * 1.8);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    backdrop-filter: blur(0.3rem);
+    mask-image: radial-gradient(closest-side, black 40%, transparent);
+  }
+
+  /* ── X-Card - Mark ─────────────────────────────────────────────────────── */
+  /* The blur above paints in the positioned layer, so the X needs its own z-index to stay on top. */
+  :is(.x-card-mark, .x-card-image) {
+    position: relative;
+    z-index: 1;
+    grid-area: card;
+    animation: x-card-grow-in 400ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  }
+
+  .x-card-mark {
+    color: var(--x-card-color);
+    font-size: var(--x-card-size);
+    line-height: 0.8;
+    text-shadow: 0 0.125rem 0.75rem var(--x-card-shadow);
+  }
+
+  .x-card-image {
+    block-size: calc(var(--x-card-size) * 0.8);
+    max-inline-size: 80vw;
+    border: none;
+    object-fit: contain;
+    filter: drop-shadow(0 0.125rem 0.75rem var(--x-card-shadow));
+  }
+}
+
+/* ── X-Card - Motion ─────────────────────────────────────────────────────── */
+@keyframes x-card-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes x-card-grow-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(#dmm-x-card),
+  :where(#dmm-x-card) :is(.x-card-mark, .x-card-image) {
+    animation: none;
+  }
+}
+
+/* ── X-Card - Toolbar Button ─────────────────────────────────────────────── */
+/* White, set through the variables .ui-control reads. Four classes outrank its theme rules. */
+:where(#scene-controls-layers) .ui-control.layer.x-card-tool-icon[data-control="xCard"] {
+  --control-icon-color: oklch(1 0 0);
+  --control-hover-icon-color: oklch(1 0 0);
+}
+
+/* The SVG is a mask, so the icon takes the text color. Also used in the Scene Controls dialog. */
+.x-card-tool-icon::before {
+  content: "";
+  display: inline-block;
+  inline-size: 1em;
+  block-size: 1em;
+  background-color: currentcolor;
+  mask: url("../../assets/x-card.svg") center / contain no-repeat;
+}

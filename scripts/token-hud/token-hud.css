@@ -1,0 +1,106 @@
+/* Token HUD. Scaling rules only apply while #hud has .dmm-hud-scaled, which
+   scale.js adds unless another HUD scaler is active. --dmm-hud-factor and
+   --dmm-hud-gap are written on #hud on every pan and zoom. */
+
+:where(#hud.dmm-hud-scaled) .placeable-hud {
+  /* ── Token HUD - Side Columns ──────────────────────────────────────────── */
+  /* Each column grows away from the token edge it touches, so it stays
+     attached at any zoom and never covers the token. */
+  /* On small tokens the columns stand off at least half the HP box's width
+     from the centre, so the HP box fits between them instead of overlapping. */
+  .col:where(.left, .right) {
+    --dmm-hud-col-offset: calc(
+      50% + max(50%, var(--control-size) * 1.25 * var(--dmm-hud-factor, 1)) + var(--dmm-hud-gap, 8px)
+    );
+
+    justify-content: center;
+    scale: var(--dmm-hud-factor, 1);
+  }
+
+  .col.left {
+    inset-inline-start: auto;
+    inset-inline-end: var(--dmm-hud-col-offset);
+    transform-origin: right center;
+  }
+
+  .col.right {
+    inset-inline-start: var(--dmm-hud-col-offset);
+    inset-inline-end: auto;
+    transform-origin: left center;
+  }
+
+  /* ── Token HUD - Attribute Bars ────────────────────────────────────────── */
+  /* Core sits the bars inside (or just past) the token box; these put the HP
+     box below the token and the second bar above it. */
+  .col.middle {
+    inset-block-start: 0;
+    block-size: 100%;
+  }
+
+  .col.middle .attribute:where(.bar1, .bar2) {
+    position: absolute;
+    inset-inline-start: 50%;
+    inline-size: max(100%, calc(var(--control-size) * 2.5));
+    translate: -50% 0;
+    scale: var(--dmm-hud-factor, 1);
+  }
+
+  .col.middle .attribute.bar1 {
+    inset-block: calc(100% + var(--dmm-hud-gap, 8px)) auto;
+    transform-origin: top center;
+  }
+
+  .col.middle .attribute.bar2 {
+    inset-block: auto calc(100% + var(--dmm-hud-gap, 8px));
+    transform-origin: bottom center;
+  }
+}
+
+:where(#hud) .placeable-hud {
+  /* ── Token HUD - Palettes ──────────────────────────────────────────────── */
+  /* palettes.js pins open palettes inside the canvas, often over the HUD's
+     own buttons, so they draw on top. The height cap comes from palettes.js
+     too, replacing core's fixed 8-row limit. */
+  /* The scaled columns are their own stacking contexts, so raise the column
+     that holds the open palette, not just the palette. */
+  .col:has(.palette.active, .dmm-token-image-palette),
+  :where(.palette.active, .dmm-token-image-palette) {
+    z-index: 10;
+  }
+
+  .status-effects {
+    max-block-size: none;
+  }
+}
+
+:where(#hud) .dmm-hud-hover-tab {
+  /* ── Token HUD - GM Hover Tab ──────────────────────────────────────────── */
+  /* A small copy of the HUD's HP box. It lives in #hud, so it follows pan and
+     zoom by itself; the scale matches the HUD parts. */
+  padding-block: 0.0625rem;
+  padding-inline: 0.375rem;
+  border: 1px solid #7cd000;
+  border-radius: 0.25rem;
+  background: var(--color-cool-5-75, rgb(11 10 19 / 75%));
+  box-shadow: 0 0 0.375rem var(--color-shadow-dark, #000);
+  color: var(--color-light-2, #ddd);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: pointer;
+  translate: -50% -50%;
+  scale: calc(var(--dmm-hud-factor, 1) * var(--dmm-hud-ui-scale, 1));
+  transform-origin: center;
+  opacity: 1;
+  transition: opacity 120ms ease-out;
+
+  @starting-style {
+    opacity: 0;
+  }
+
+  &:hover {
+    border-color: #a6ff2e;
+  }
+}
