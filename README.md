@@ -27,7 +27,7 @@ https://github.com/jeffwain/foundry-vtt-dmm-qol/releases/latest/download/module.
 
 I find that the Token HUD in Foundry is one of the most neglected pieces of the UI. It doesn't scale with your zoom level and often gets in the way or isn't smart enough to stay in view. My take on it tries to improve that behavior.
 
-A replacement for [Illandril's Token HUD Scale](https://github.com/illandril/FoundryVTT-token-hud-scale) in v14. Don't run both, and make sure custom-dnd5e's **Token HUD Improvements** is off. Settings are saved per user.
+This is a replacement for [Illandril's Token HUD Scale](https://github.com/illandril/FoundryVTT-token-hud-scale) in v14. Don't run both, and make sure Custom D&D 5e's Token HUD Improvements setting is off.
 
 | Setting | Effect |
 |---|---|
