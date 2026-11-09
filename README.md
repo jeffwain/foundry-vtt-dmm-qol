@@ -1,14 +1,13 @@
 # The Dice Monster's Miscellany - Foundry D&D 5e Quality of Life Improvements
 
-This module contains hightouch's Foundry D&D 5e Quality of Life improvements. Generally these are things where I've found that the UI and functionality can be streamlined to make Foundry a better tool for DMs and players. These are opinionated updates that make complicated functionality across Foundry and the 5e system easier to use for more tables.
+This module contains my (hightouch 👋) quality of life improvements for Foundry v14 and 5e v6.x to streamline the UI and functionality for DMs and players. They're mostly here to make complicated functionality across Foundry and the 5e system easier to use for more tables.
 
-I recommend that this module run alongside the following modules:
+I recommend using this with the following modules:
 
-- Larkinabout's Custom D&D 5e (https://github.com/larkinabout/foundry-vtt-custom-dnd5e). This lets you customize world settings without needing to maintain a world script. However, turn *off* token scaling in Custom D&D 5e as it will conflict with this module.
-- theripper93's Dig Down (https://github.com/theripper93/fuzzy-foundry). I use indexing from Dig Down for quick token image searching, but you only really need it if you have thousands of saved token/portrait images on-hand.
-- Nik's Token Motion (https://github.com/nschoenwald/niks-token-motion). This module adds token motion effects to your tokens. I started this module specifically as a replacement for TokenEase, but Nik's has done it better than I did.
-
-Yes much of the functionality of this module was built with AI assistance. However, it's all been vetted and tested thoroughly.
+- **[Larkinabout's Custom D&D 5e](https://github.com/larkinabout/foundry-vtt-custom-dnd5e)**. This lets you customize world settings without needing to maintain a world script. However, turn *off* token scaling in Custom D&D 5e as it will conflict with this module.
+- **[theripper93's Dig Down](https://github.com/theripper93/fuzzy-foundry)**. I use indexing from Dig Down for quick token image searching, but you only really need it if you have more than a thousand saved token/portrait images on-hand.
+- **[Nik's Token Motion](https://github.com/nschoenwald/niks-token-motion)**. This module adds token motion effects to your tokens. I started this module specifically as a replacement for TokenEase, but Nik's has done it better than I did.
+- **[7H3LaughingMan's Wayfinder](https://github.com/7H3LaughingMan/wayfinder)**. Because Foundry desperately needs pathfinding for gridded maps, and players trying to move around walls is painful to watch. This isn't as good as some of the old pathfinding modules, but works well for now. Overrides some Token Motion animations like pickup.
 
 ## Installation
 
@@ -18,7 +17,7 @@ In Foundry's **Add-on Modules** screen, click **Install Module** and paste this 
 https://github.com/jeffwain/foundry-vtt-dmm-qol/releases/latest/download/module.json
 ```
 
----
+&nbsp;
 
 ## Features
 
@@ -93,7 +92,11 @@ Adds a stylized version of John Stavropolous's X-Card safety tools. Look for the
 
 Small CSS tweaks that clean up the interface, like chat spacing and sidebar padding.
 
----
+&nbsp;
+
+## Disclaimers
+
+Most of the functionality of this module was built with AI assistance. However, it's all been vetted and tested thoroughly by me, even if it's not how I'd personally write it by hand.
 
 ## Credits
 
