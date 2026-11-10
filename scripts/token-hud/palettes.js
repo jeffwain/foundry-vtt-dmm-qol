@@ -16,7 +16,7 @@ const MLD_LIST = "#token-hud.monks-little-details .status-effects";
 const MLD_ROWS = /^repeat\((\d+),\s*[\d.]+%\)$/;
 
 /** Screen rect of the canvas not covered by the sidebar or the scene controls. */
-export function visibleArea() {
+function measureVisibleArea() {
   const board = document.getElementById("board")?.getBoundingClientRect();
   const area = board
     ? { left: board.left, top: board.top, right: board.right, bottom: board.bottom }
@@ -26,6 +26,22 @@ export function visibleArea() {
   const controls = document.getElementById("scene-controls")?.getBoundingClientRect();
   if (controls?.width) area.left = Math.max(area.left, controls.right);
   return area;
+}
+
+/**
+ * The visible area only changes on a window resize, a sidebar resize or a
+ * new scene controls bar, so it is measured once and kept until one of those.
+ * Measuring it on every pan forced a layout right after core moved #hud.
+ */
+let cachedArea = null;
+
+export function visibleArea() {
+  cachedArea ??= measureVisibleArea();
+  return cachedArea;
+}
+
+function forgetArea() {
+  cachedArea = null;
 }
 
 /**
@@ -58,27 +74,48 @@ function setMldClearAllSticky(el, sticky) {
   if (rows) el.style.gridTemplateRows = sticky ? `auto repeat(${rows}, auto)` : `repeat(${rows}, auto)`;
 }
 
-/** Move and cap one open palette so it sits inside the visible canvas. */
+/** The offset (local px) last written on each palette, and whether it was capped. */
+const applied = new WeakMap();
+
+/**
+ * Move and cap one open palette so it sits inside the visible canvas.
+ *
+ * Its natural position is the measured one minus the offset written last
+ * time, so it is measured once instead of cleared and measured again. A
+ * capped palette hides its natural height, so that rarer case still clears
+ * first.
+ */
 function fitPalette(el, area) {
-  // Measure from where the palette would naturally sit, not from last time's offset.
-  el.style.translate = "";
-  el.style.maxHeight = "";
-  el.style.overflowY = "";
   const isMld = el.matches(MLD_LIST);
-  if (isMld) prepareMldList(el);
+  let last = applied.get(el);
+  if (!last || last.capped) {
+    el.style.translate = "";
+    el.style.maxHeight = "";
+    el.style.overflowY = "";
+    if (isMld) prepareMldList(el);
+    last = { tx: 0, ty: 0 };
+  }
 
   const rect = el.getBoundingClientRect();
   if (!rect.width || !el.offsetWidth) return;
   // Palettes sit inside the scaled #hud and HUD columns; convert screen px back to local px.
   const scale = rect.width / el.offsetWidth;
-  const { dx, dy, maxHeight } = clampToArea(rect, area, MARGIN);
+  const ox = last.tx * scale;
+  const oy = last.ty * scale;
+  const natural = { left: rect.left - ox, right: rect.right - ox, top: rect.top - oy, bottom: rect.bottom - oy };
+  const { dx, dy, maxHeight } = clampToArea(natural, area, MARGIN);
 
-  if (rect.height > maxHeight) {
+  const capped = rect.height > maxHeight;
+  if (capped) {
     el.style.maxHeight = `${maxHeight / scale}px`;
     el.style.overflowY = "auto";
     if (isMld) setMldClearAllSticky(el, true);
   }
-  if (dx || dy) el.style.translate = `${dx / scale}px ${dy / scale}px`;
+  const tx = dx / scale;
+  const ty = dy / scale;
+  const translate = dx || dy ? `${tx}px ${ty}px` : "";
+  if (el.style.translate !== translate) el.style.translate = translate;
+  applied.set(el, { tx: dx ? tx : 0, ty: dy ? ty : 0, capped });
 }
 
 function anyHudRendered() {
@@ -98,18 +135,30 @@ export function fitOpenPalettes() {
 
 let observed = null;
 
+/** Only class changes and new nodes: our own inline style writes must not retrigger it. */
+const HUD_CHANGES = { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] };
+
+/**
+ * Watch #hud's direct children and the inside of each placeable HUD. Not all
+ * of #hud: it also holds #measurement, whose ruler labels core rebuilds on
+ * every drag refresh, other users' drags included.
+ * The callback runs as a microtask, before paint, so a palette never shows unclamped.
+ */
 function observeHud() {
   const hud = document.getElementById("hud");
   if (!hud || hud === observed) return;
   observed = hud;
-  // Only class changes and new nodes: our own inline style writes must not retrigger it.
-  // The callback runs as a microtask, before paint, so a palette never shows unclamped.
-  new MutationObserver(fitOpenPalettes).observe(hud, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    attributeFilter: ["class"],
+  const observer = new MutationObserver((records) => {
+    // Core inserts a new element for a HUD when it renders; watch that one too.
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.parentElement === hud && node.classList?.contains("placeable-hud")) observer.observe(node, HUD_CHANGES);
+      }
+    }
+    fitOpenPalettes();
   });
+  observer.observe(hud, { childList: true });
+  for (const el of hud.querySelectorAll(":scope > .placeable-hud")) observer.observe(el, HUD_CHANGES);
 }
 
 /* Hover to open, as custom-dnd5e's Token HUD Improvements does: resting on a
@@ -169,8 +218,14 @@ export function startPalettes() {
   Hooks.on("canvasPan", () => {
     if (anyHudRendered()) queueMicrotask(fitOpenPalettes);
   });
-  window.addEventListener("resize", fitOpenPalettes);
+  const remeasure = () => {
+    forgetArea();
+    fitOpenPalettes();
+  };
+  window.addEventListener("resize", remeasure);
+  Hooks.on("canvasReady", forgetArea);
+  Hooks.on("renderSceneControls", forgetArea);
   // Follows the sidebar's collapse animation frame by frame.
   const sidebar = document.getElementById("sidebar");
-  if (sidebar) new ResizeObserver(fitOpenPalettes).observe(sidebar);
+  if (sidebar) new ResizeObserver(remeasure).observe(sidebar);
 }

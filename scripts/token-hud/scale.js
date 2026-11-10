@@ -19,6 +19,13 @@ const GAP_PX = 6;
 
 let active = false;
 
+/**
+ * What the last write was worked out from. A plain pan leaves the zoom alone,
+ * and a changed custom property restyles all of #hud, so unchanged inputs
+ * skip the write.
+ */
+let lastInputs = null;
+
 /** Write --dmm-hud-factor and --dmm-hud-gap on #hud for the current zoom. */
 export function writeHudVars() {
   const hud = canvas?.hud?.element;
@@ -26,7 +33,11 @@ export function writeHudVars() {
   const { buttonScale, response, floor } = getHudSettings();
   const stageScale = canvas.stage.scale.x;
   const gridSize = canvas.dimensions.size;
-  const coreUiScale = canvas.dimensions.uiScale ? (canvas.dimensions.uiScale * 100) / gridSize : (game.settings.get("core", "uiConfig")?.uiScale ?? 1);
+  const uiScale = canvas.dimensions.uiScale;
+  const coreUiScale = uiScale ? (uiScale * 100) / gridSize : (game.settings.get("core", "uiConfig")?.uiScale ?? 1);
+  const inputs = [hud, stageScale, gridSize, coreUiScale, buttonScale, response, floor];
+  if (lastInputs?.every((value, i) => value === inputs[i])) return;
+  lastInputs = inputs;
   const { factor, gap } = hudMetrics({
     stageScale,
     gridSize,

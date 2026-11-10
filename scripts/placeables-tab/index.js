@@ -4,9 +4,10 @@
  * - Click an entry to centre the canvas on it, keeping the current zoom.
  * - Middle-click an entry to open its sheet without waiting on a double-click.
  *
- * Both patch core's PlaceableTab, the base class of every sub-tab (Tokens,
- * Tiles, Walls and so on). Sub-tabs are built the first time they're opened,
- * so patching at init catches all of them.
+ * Centre-on-click wraps core's PlaceableTab entry handler, so it adds no
+ * listeners of its own. Middle-click needs real listeners; they go on the
+ * Placeables directory (PlaceableDirectory) once, the first time it's opened,
+ * rather than on every sub-tab frame from launch.
  */
 
 import CONSTANTS from "../shared/constants.js";
@@ -36,19 +37,48 @@ function patchPlaceableTab() {
     if (object) canvas.animatePan(object.center);
     return result;
   };
+}
 
-  const originalAttach = proto._attachFrameListeners;
-  proto._attachFrameListeners = function () {
-    originalAttach.call(this);
-    // Stop the browser's middle-button autoscroll from starting on an entry.
-    this.element.addEventListener("mousedown", (event) => {
-      if (setting(KEYS.MIDDLE_CLICK_SHEET) && isEntryMiddleClick(event)) event.preventDefault();
-    });
-    this.element.addEventListener("auxclick", (event) => {
-      if (!setting(KEYS.MIDDLE_CLICK_SHEET) || !isEntryMiddleClick(event)) return;
-      event.preventDefault();
-      this._onConfigureEntry(event, event.target);
-    });
+/** Directory elements that already have the middle-click listeners. */
+const listening = new WeakSet();
+
+/**
+ * Add the middle-click listeners to a directory's element, once. They're
+ * delegated, so they cover whichever sub-tab is showing.
+ */
+function listenForMiddleClick(directory) {
+  const el = directory.element;
+  if (!el || listening.has(el)) return;
+  listening.add(el);
+  // Stop the browser's middle-button autoscroll from starting on an entry.
+  el.addEventListener("mousedown", (event) => {
+    if (setting(KEYS.MIDDLE_CLICK_SHEET) && isEntryMiddleClick(event)) event.preventDefault();
+  });
+  el.addEventListener("auxclick", (event) => {
+    if (!setting(KEYS.MIDDLE_CLICK_SHEET) || !isEntryMiddleClick(event)) return;
+    const tab = directory.tab;
+    if (!tab) return;
+    event.preventDefault();
+    tab._onConfigureEntry(event, event.target);
+  });
+}
+
+function patchPlaceableDirectory() {
+  const proto = foundry.applications.sidebar.tabs.PlaceableDirectory.prototype;
+
+  const originalActivate = proto._onActivate;
+  proto._onActivate = function (...args) {
+    const result = originalActivate.apply(this, args);
+    listenForMiddleClick(this);
+    return result;
+  };
+
+  // A pop-out, or a world that loads with this tab already showing, may
+  // render without an activate call.
+  const originalRender = proto._onRender;
+  proto._onRender = async function (...args) {
+    await originalRender.apply(this, args);
+    if (this.isPopout || this.active) listenForMiddleClick(this);
   };
 }
 
@@ -71,4 +101,5 @@ Hooks.once("init", () => {
     default: true,
   });
   patchPlaceableTab();
+  patchPlaceableDirectory();
 });

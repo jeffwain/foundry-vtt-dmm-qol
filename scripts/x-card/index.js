@@ -10,6 +10,7 @@
 import CONSTANTS from "../shared/constants.js";
 import { KEYS } from "./keys.js";
 import { listenForCards, pressCard } from "./overlay.js";
+import { scheduleRefresh as refreshFonts } from "../fonts/apply.js";
 
 const MODULE = CONSTANTS.MODULE_NAME;
 
@@ -21,6 +22,8 @@ function onEnabledChange() {
   // Add or remove the button, and the X-Card section of an open Fonts dialog.
   ui.controls?.render({ reset: true });
   foundry.applications.instances.get("dmm-fonts")?.render();
+  // Its fonts are only registered while the button is on.
+  refreshFonts();
 }
 
 Hooks.once("init", () => {

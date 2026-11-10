@@ -276,6 +276,37 @@ async function togglePalette(button, token) {
   await runSearch();
 }
 
+/** Each results grid's loader, so a new search can stop the last one. */
+const loaders = new WeakMap();
+
+/**
+ * Load tile media only as it scrolls near the visible part of the grid. The
+ * grid shows about 14 of up to 100 tiles, and each one is full-size art or a
+ * video, so loading them all at once was the slow part of opening it.
+ * loading="lazy" doesn't help here: it works from the window, not this
+ * scrolling box, so every tile counted as near.
+ */
+function mediaLoader(container) {
+  loaders.get(container)?.disconnect();
+  const loader = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const media = entry.target.querySelector("img, video");
+        if (media?.dataset.src) {
+          media.src = media.dataset.src;
+          delete media.dataset.src;
+        }
+        loader.unobserve(entry.target);
+      }
+    },
+    // One grid height ahead, so tiles are ready by the time they scroll in.
+    { root: container, rootMargin: "100% 0px" },
+  );
+  loaders.set(container, loader);
+  return loader;
+}
+
 /** The Image Folders section name for a search kind, e.g. "Tokens (Other)". */
 function kindLabel(kind) {
   return game.i18n.localize(`PLAYER-FOLDERS.kind-${kind}`);
@@ -291,6 +322,7 @@ function kindLabel(kind) {
  */
 function renderResults(container, images, token, kind, applyMode) {
   if (!images?.length) {
+    loaders.get(container)?.disconnect();
     container.innerHTML = searchPathsFor(kind).length
       ? `<p class="dmm-ti-status">${game.i18n.localize("TOKEN-IMAGES.no-matches")}</p>`
       : `<div class="dmm-ti-status">
@@ -302,6 +334,7 @@ function renderResults(container, images, token, kind, applyMode) {
 
   const currentSrc = currentTokenSrc(token, applyMode);
   const fragment = document.createDocumentFragment();
+  const loader = mediaLoader(container);
 
   for (const img of images) {
     const tile = document.createElement("div");
@@ -312,7 +345,7 @@ function renderResults(container, images, token, kind, applyMode) {
 
     if (isVideo(img.path)) {
       const video = document.createElement("video");
-      video.src = img.path;
+      video.dataset.src = img.path;
       video.muted = true;
       video.loop = true;
       video.preload = "metadata";
@@ -324,13 +357,13 @@ function renderResults(container, images, token, kind, applyMode) {
       tile.appendChild(video);
     } else {
       const image = document.createElement("img");
-      image.src = img.path;
-      image.loading = "lazy";
+      image.dataset.src = img.path;
       image.decoding = "async";
       tile.appendChild(image);
     }
 
     fragment.appendChild(tile);
+    loader.observe(tile);
   }
 
   container.replaceChildren(fragment);
