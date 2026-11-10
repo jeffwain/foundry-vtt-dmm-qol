@@ -47,7 +47,9 @@ export function enabledFonts(scanned, disabled) {
 
 /**
  * Turn enabled font files into Foundry font definitions (the shape used by
- * CONFIG.fontDefinitions). `editor: true` also offers them in text editors.
+ * CONFIG.fontDefinitions). They stay out of text editors: core's own font
+ * list decides what editors offer.
+ * `display: "swap"` shows text in a fallback while a late font is still loading.
  *
  * @param {string[]} paths  Data-relative font file paths.
  * @returns {Map<string, object>}  family -> definition; the first file wins a name clash.
@@ -57,9 +59,71 @@ export function fontDefinitionsFor(paths) {
   for (const path of Array.isArray(paths) ? paths : []) {
     const family = familyFromFilename(path);
     if (!family || definitions.has(family)) continue;
-    definitions.set(family, { editor: true, fonts: [{ urls: [path] }] });
+    definitions.set(family, { editor: false, fonts: [{ urls: [path], display: "swap" }] });
   }
   return definitions;
+}
+
+/**
+ * The definitions to register with Foundry. Every client downloads each one
+ * before the canvas draws, so only fonts something uses are registered. A
+ * family in core's font list is left out: core loads it already.
+ *
+ * @param {Map<string, object>} definitions  family -> definition, from fontDefinitionsFor.
+ * @param {object} uses
+ * @param {Record<string, string>} [uses.characters]  actorId -> family
+ * @param {string} [uses.fallback]                   The default character font.
+ * @param {string} [uses.pause]                       Family for the pause caption.
+ * @param {string[]} [uses.xCard]                     Families the X-Card cycles through.
+ * @param {Set<string>} [uses.core]                   Families in core's font list.
+ * @returns {Map<string, object>}
+ */
+export function definitionsToRegister(definitions, { characters, fallback, pause, xCard, core }) {
+  const used = new Set([...Object.values(characters ?? {}), fallback, pause, ...(xCard ?? [])]);
+  const out = new Map();
+  for (const [family, definition] of definitions) {
+    if (used.has(family) && !core?.has(family)) out.set(family, definition);
+  }
+  return out;
+}
+
+/*
+ * Core's font list is the "core.fonts" world setting: family ->
+ * { editor, fonts: [{ urls, weight, style }] }, as Foundry's Font
+ * Configuration dialog writes it. These helpers return new objects so the
+ * setting's cached value is never changed in place.
+ */
+
+/** Every font file in core's font list. */
+export function coreFontPaths(core) {
+  const paths = new Set();
+  for (const definition of Object.values(core ?? {})) {
+    for (const font of definition?.fonts ?? []) {
+      for (const url of font?.urls ?? []) paths.add(url);
+    }
+  }
+  return paths;
+}
+
+/** Add a file to core's font list, under its family, as core's dialog would. */
+export function addCoreFont(core, family, path) {
+  if (coreFontPaths(core).has(path)) return core;
+  const next = { ...core };
+  const existing = next[family] ?? { editor: true, fonts: [] };
+  next[family] = { ...existing, fonts: [...existing.fonts, { urls: [path], weight: 400, style: "normal" }] };
+  return next;
+}
+
+/** Take a file out of core's font list, and its family once it has no files left. */
+export function removeCoreFont(core, path) {
+  const next = {};
+  for (const [family, definition] of Object.entries(core ?? {})) {
+    const fonts = definition.fonts ?? [];
+    const kept = fonts.filter((font) => !font?.urls?.includes(path));
+    if (kept.length === fonts.length) next[family] = definition;
+    else if (kept.length) next[family] = { ...definition, fonts: kept };
+  }
+  return next;
 }
 
 /**
@@ -74,6 +138,25 @@ export function fontDefinitionsFor(paths) {
 export function characterFamily(characters, actorId, families) {
   const family = characters?.[actorId] ?? "";
   return family && families.has(family) ? family : "";
+}
+
+/**
+ * Actors whose shown font differs between two settings snapshots, so only
+ * their nameplates need redrawing.
+ *
+ * @param {{characters: Record<string, string>, families: Set<string>}} before
+ * @param {{characters: Record<string, string>, families: Set<string>}} after
+ * @returns {Set<string>}  Actor ids.
+ */
+export function changedFontActors(before, after) {
+  const changed = new Set();
+  const ids = new Set([...Object.keys(before.characters ?? {}), ...Object.keys(after.characters ?? {})]);
+  for (const id of ids) {
+    if (characterFamily(before.characters, id, before.families) !== characterFamily(after.characters, id, after.families)) {
+      changed.add(id);
+    }
+  }
+  return changed;
 }
 
 /**
@@ -132,7 +215,9 @@ const PLAIN_ID = /^[A-Za-z0-9]+$/;
  * only for their header title.
  *
  * The .application prefix lifts the rules over Tidy's own (0,2,1) input
- * styles without needing !important.
+ * styles without needing !important. When locked, the name text sits in an
+ * <a> child, so that child is named directly rather than with a `*` rule
+ * that would be tested against every element.
  *
  * @param {object} options
  * @param {Record<string, string>} [options.characters]  actorId -> family
@@ -147,9 +232,9 @@ export function fontRulesCss({ characters = {}, pause = "", families }) {
     if (!PLAIN_ID.test(actorId) || !families.has(family)) continue;
     const font = `font-family: "${escapeCssString(family)}";`;
     const name = `.application[id$="-Actor-${actorId}"] [data-tidy-sheet-part="actor-name"]`;
-    rules.push(`${name},\n${name} * { ${font} }`);
+    rules.push(`${name},\n${name} > a { ${font} }`);
     const itemTitle = `.application[id*="-Actor-${actorId}-Item-"] .document-name`;
-    rules.push(`${itemTitle},\n${itemTitle} * { ${font} }`);
+    rules.push(`${itemTitle},\n${itemTitle} > a { ${font} }`);
   }
 
   if (pause && families.has(pause)) {

@@ -16,10 +16,21 @@
   }
 
   /* ── Fonts Dialog - Font Files ─────────────────────────────────────────── */
-  .dmm-fonts-files-group > label {
-    display: block;
+  /* The label on one side, the link to core's font dialog on the other. */
+  .dmm-fonts-files-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
     margin-block-end: 0.3rem;
-    font-weight: 700;
+
+    label {
+      font-weight: 700;
+    }
+
+    a {
+      font-size: 0.85rem;
+    }
   }
 
   .dmm-fonts-files {
@@ -57,6 +68,47 @@
     span {
       font-size: inherit;
     }
+  }
+
+  /* ── Fonts Dialog - Font Table ─────────────────────────────────────────── */
+  .dmm-fonts-table {
+    /* Fixed, so a long font name ellipsizes instead of widening the table. */
+    table-layout: fixed;
+    inline-size: 100%;
+    margin: 0;
+    border: none;
+    border-collapse: collapse;
+    background: none;
+
+    :is(th, td) {
+      padding-block: 0.25rem;
+      padding-inline: 0.25rem;
+      border-block-end: 0.0625rem solid var(--color-border-light-tertiary, #7a7971);
+    }
+
+    tr:last-child td {
+      border-block-end: none;
+    }
+
+    th {
+      font-size: 0.8rem;
+      text-align: start;
+      text-transform: uppercase;
+    }
+
+    /* The checkbox columns stay narrow so the font name gets the room. */
+    .dmm-fonts-box {
+      inline-size: 4.5rem;
+      text-align: center;
+    }
+  }
+
+  .dmm-fonts-name span {
+    display: block;
+    overflow: hidden;
+    font-size: 1.25rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* ── Fonts Dialog - Footer ─────────────────────────────────────────────── */

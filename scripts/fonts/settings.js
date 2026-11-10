@@ -2,9 +2,11 @@
  * Fonts settings.
  *
  * One Configure-Settings entry opens a dialog that lists the font files in a
- * folder, each with a toggle. Enabled fonts can then be picked for each
- * character (their Tidy sheet header, owned item titles and token nameplate)
- * and for the pause caption.
+ * folder in a table. The Custom column switches a font on for this module:
+ * enabled fonts can be picked for each character (their Tidy sheet header,
+ * owned item titles and token nameplate), the pause caption and the X-Card.
+ * The Core column adds or removes the file in Foundry's own font list, which
+ * is what text editors, drawings and map notes offer.
  *
  * Every control saves as soon as it changes, so the dialog has no Save button.
  * Fonts are on unless unticked: the dialog stores what was switched off and
@@ -15,8 +17,8 @@ import CONSTANTS from "../shared/constants.js";
 import SettingsGroupDialog, { escapeHTML } from "../shared/settings-dialog.js";
 import { basename, scanFonts, clearFileCache } from "../shared/files.js";
 import { DEFAULTS, KEYS } from "./keys.js";
-import { enabledFonts, familyFromFilename, fontDefinitionsFor } from "./render.js";
-import { scheduleRefresh } from "./apply.js";
+import { addCoreFont, coreFontPaths, enabledFonts, familyFromFilename, fontDefinitionsFor, removeCoreFont } from "./render.js";
+import { coreFamilies, scheduleRefresh } from "./apply.js";
 import { KEYS as X_CARD_KEYS } from "../x-card/keys.js";
 
 const MODULE = CONSTANTS.MODULE_NAME;
@@ -51,8 +53,16 @@ export function registerFontsSettings() {
   world(KEYS.CHARACTERS, Object, {}, scheduleRefresh);
   world(KEYS.CHARACTER_DEFAULT, String, "", scheduleRefresh);
   world(KEYS.PAUSE, String, "", scheduleRefresh);
-  world(KEYS.X_CARD, Array, []);
+  // Changes which fonts are registered, so it refreshes.
+  world(KEYS.X_CARD, Array, [], scheduleRefresh);
 }
+
+/** Keep an open Fonts dialog's Core column in step with core's font list. */
+function onSettingChange(setting) {
+  if (setting.key === "core.fonts") foundry.applications.instances.get("dmm-fonts")?.syncCoreFonts?.();
+}
+Hooks.on("createSetting", onSettingChange);
+Hooks.on("updateSetting", onSettingChange);
 
 /** Families already loaded for the dialog's previews. */
 const previewed = new Set();
@@ -60,11 +70,12 @@ const previewed = new Set();
 /**
  * Load a font so its name can be shown in its own face. Fire and forget: the
  * label swaps over once the file arrives. Families core defines are skipped so
- * a folder file can't add faces to Foundry's own fonts.
+ * a folder file can't add faces to Foundry's own fonts, and so are those in
+ * core's font list, which core has loaded already.
  */
-function loadPreview(path) {
+function loadPreview(path, core) {
   const family = familyFromFilename(path);
-  if (!family || previewed.has(family) || family in CONFIG.fontDefinitions) return;
+  if (!family || previewed.has(family) || family in CONFIG.fontDefinitions || core.has(family)) return;
   previewed.add(family);
   foundry.applications.settings.menus.FontConfig.loadFont(family, { fonts: [{ urls: [path] }] });
 }
@@ -91,10 +102,33 @@ class FontsConfig extends SettingsGroupDialog {
   /** Families ticked for the X-Card, kept locally for the same reason. */
   #xCard = new Set();
 
+  /** Core's font list as last written here, for the same reason. */
+  #core = {};
+
+  /** Whether this dialog changed core's font list, so closing offers a reload. */
+  #coreChanged = false;
+
+  /** Writes to core's font list still in flight from this dialog. */
+  #coreWrites = 0;
+
+  /**
+   * Core's font list changed, perhaps from Foundry's own dialog. Re-read it so
+   * the next tick here doesn't write over that change.
+   */
+  syncCoreFonts() {
+    if (this.#coreWrites || !this.rendered) return;
+    this.#core = game.settings.get("core", "fonts") ?? {};
+    const inCore = coreFontPaths(this.#core);
+    for (const box of this.element.querySelectorAll(".dmm-fonts-core-toggle")) box.checked = inCore.has(box.dataset.path);
+    this.#syncAllBoxes();
+  }
+
   /** @inheritDoc */
   async _renderHTML() {
     this.#scanned = await scanFonts(setting(KEYS.FOLDER) || DEFAULTS.FOLDER);
-    this.#scanned.forEach(loadPreview);
+    const core = coreFamilies();
+    this.#scanned.forEach((path) => loadPreview(path, core));
+    this.#core = game.settings.get("core", "fonts") ?? {};
     this.#disabled = new Set(setting(KEYS.DISABLED) ?? []);
     this.#xCard = new Set(setting(KEYS.X_CARD) ?? []);
 
@@ -128,18 +162,8 @@ class FontsConfig extends SettingsGroupDialog {
   }
 
   #folderHTML() {
-    const rows = this.#scanned.length
-      ? this.#scanned
-          .map((path) => {
-            const family = familyFromFilename(path);
-            const on = this.#disabled.has(path) ? "" : "checked";
-            return `
-          <label class="dmm-fonts-file" data-tooltip="${escapeHTML(basename(path))}">
-            <input type="checkbox" class="dmm-fonts-toggle" data-path="${escapeHTML(path)}" ${on}/>
-            <span style="${escapeHTML(`font-family: "${family}"`)}">${escapeHTML(family)}</span>
-          </label>`;
-          })
-          .join("")
+    const list = this.#scanned.length
+      ? this.#tableHTML()
       : `<p class="hint">${game.i18n.localize("FONTS.files-empty")}</p>`;
 
     return `
@@ -154,9 +178,52 @@ class FontsConfig extends SettingsGroupDialog {
         <p class="hint">${game.i18n.localize("FONTS.folder-hint")}</p>
       </div>
       <div class="dmm-fonts-files-group">
-        <label>${escapeHTML(game.i18n.localize("FONTS.files"))}</label>
-        <div class="dmm-fonts-files dmm-fonts-scroll">${rows}</div>
+        <div class="dmm-fonts-files-heading">
+          <label>${escapeHTML(game.i18n.localize("FONTS.files"))}</label>
+          <a data-action="open-core"><i class="fas fa-up-right-from-square"></i> ${escapeHTML(game.i18n.localize("FONTS.open-core"))}</a>
+        </div>
+        <div class="dmm-fonts-files dmm-fonts-scroll">${list}</div>
+        <p class="hint">${escapeHTML(game.i18n.localize("FONTS.files-hint"))}</p>
       </div>`;
+  }
+
+  /** One row per file: its name in its own face, then the Custom and Core boxes. */
+  #tableHTML() {
+    const t = (key) => escapeHTML(game.i18n.localize(key));
+    const inCore = coreFontPaths(this.#core);
+    const rows = this.#scanned
+      .map((path) => {
+        const family = familyFromFilename(path);
+        const p = escapeHTML(path);
+        return `
+          <tr>
+            <td class="dmm-fonts-name" data-tooltip="${escapeHTML(basename(path))}">
+              <span style="${escapeHTML(`font-family: "${family}"`)}">${escapeHTML(family)}</span>
+            </td>
+            <td class="dmm-fonts-box"><input type="checkbox" class="dmm-fonts-toggle" data-path="${p}" ${this.#disabled.has(path) ? "" : "checked"}/></td>
+            <td class="dmm-fonts-box"><input type="checkbox" class="dmm-fonts-core-toggle" data-path="${p}" ${inCore.has(path) ? "checked" : ""}/></td>
+          </tr>`;
+      })
+      .join("");
+    // The All boxes' checked/indeterminate state is set by #syncAllBoxes after render.
+    return `
+      <table class="dmm-fonts-table">
+        <thead>
+          <tr>
+            <th>${t("FONTS.column-font")}</th>
+            <th class="dmm-fonts-box" data-tooltip="${t("FONTS.column-custom-hint")}">${t("FONTS.column-custom")}</th>
+            <th class="dmm-fonts-box" data-tooltip="${t("FONTS.column-core-hint")}">${t("FONTS.column-core")}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="dmm-fonts-all-row">
+            <td>${t("FONTS.all")}</td>
+            <td class="dmm-fonts-box"><input type="checkbox" class="dmm-fonts-custom-all"/></td>
+            <td class="dmm-fonts-box"><input type="checkbox" class="dmm-fonts-core-all"/></td>
+          </tr>
+          ${rows}
+        </tbody>
+      </table>`;
   }
 
   #charactersHTML() {
@@ -259,9 +326,14 @@ class FontsConfig extends SettingsGroupDialog {
   async _replaceHTML(result, content) {
     await super._replaceHTML(result, content);
 
-    content.querySelectorAll(".dmm-fonts-toggle").forEach((box) => {
-      box.addEventListener("change", () => this.#onToggle(box));
+    content.querySelector(".dmm-fonts-table")?.addEventListener("change", (ev) => {
+      const box = ev.target;
+      if (box.matches(".dmm-fonts-toggle")) this.#onToggle(box);
+      else if (box.matches(".dmm-fonts-core-toggle")) this.#onCore(box);
+      else if (box.matches(".dmm-fonts-custom-all")) this.#onCustomAll(box.checked);
+      else if (box.matches(".dmm-fonts-core-all")) this.#onCoreAll(box.checked);
     });
+    this.#syncAllBoxes(content);
     content.querySelectorAll(".dmm-fonts-character").forEach((select) => {
       select.addEventListener("change", () => this.#onCharacter(select));
     });
@@ -279,12 +351,81 @@ class FontsConfig extends SettingsGroupDialog {
     content.querySelector(`[name="${KEYS.FOLDER}"]`)?.addEventListener("change", (ev) => this.#onFolder(ev.currentTarget.value));
   }
 
-  async #onToggle(box) {
+  #onToggle(box) {
     if (box.checked) this.#disabled.delete(box.dataset.path);
     else this.#disabled.add(box.dataset.path);
+    return this.#saveCustom();
+  }
+
+  /** Switch every font on or off for this module. */
+  #onCustomAll(checked) {
+    for (const box of this.element.querySelectorAll(".dmm-fonts-toggle")) {
+      box.checked = checked;
+      if (checked) this.#disabled.delete(box.dataset.path);
+      else this.#disabled.add(box.dataset.path);
+    }
+    return this.#saveCustom();
+  }
+
+  async #saveCustom() {
+    this.#syncAllBoxes();
     this.#refreshPickers();
     await save(KEYS.DISABLED, [...this.#disabled]);
     await save(KEYS.ENABLED, enabledFonts(this.#scanned, [...this.#disabled]));
+  }
+
+  #onCore(box) {
+    return this.#saveCore([box]);
+  }
+
+  /** Add every file to core's font list, or take them all out. */
+  #onCoreAll(checked) {
+    const boxes = [...this.element.querySelectorAll(".dmm-fonts-core-toggle")];
+    for (const box of boxes) box.checked = checked;
+    return this.#saveCore(boxes);
+  }
+
+  /**
+   * Write the given boxes' state into core's font list. Added fonts are loaded
+   * straight away, as core's own dialog does, so this client's editors offer
+   * them before the reload.
+   */
+  async #saveCore(boxes) {
+    let core = this.#core;
+    const added = [];
+    for (const box of boxes) {
+      const path = box.dataset.path;
+      const next = box.checked ? addCoreFont(core, familyFromFilename(path), path) : removeCoreFont(core, path);
+      if (next === core) continue;
+      if (box.checked) added.push(path);
+      core = next;
+    }
+    this.#syncAllBoxes();
+    if (core === this.#core) return;
+    this.#core = core;
+    this.#coreChanged = true;
+    this.#coreWrites++;
+    try {
+      await game.settings.set("core", "fonts", core);
+    } finally {
+      this.#coreWrites--;
+    }
+    const { FontConfig } = foundry.applications.settings.menus;
+    for (const path of added) FontConfig.loadFont(familyFromFilename(path), { editor: true, fonts: [{ urls: [path] }] });
+  }
+
+  /** Each All box is checked when every box below it is, a dash when only some are. */
+  #syncAllBoxes(root = this.element) {
+    const sync = (allSelector, boxSelector) => {
+      const all = root.querySelector(allSelector);
+      if (!all) return;
+      const boxes = [...root.querySelectorAll(boxSelector)];
+      const ticked = boxes.filter((box) => box.checked).length;
+      all.checked = ticked > 0 && ticked === boxes.length;
+      all.indeterminate = ticked > 0 && ticked < boxes.length;
+    };
+    sync(".dmm-fonts-custom-all", ".dmm-fonts-toggle");
+    sync(".dmm-fonts-core-all", ".dmm-fonts-core-toggle");
   }
 
   /**
@@ -374,6 +515,18 @@ class FontsConfig extends SettingsGroupDialog {
       await this.#onReset();
     } else if (action === "done") {
       await this.close();
+    } else if (action === "open-core") {
+      new foundry.applications.settings.menus.FontConfig().render({ force: true });
     }
+  }
+
+  /** Other clients read core's font list once per page load, so offer a reload. */
+  async close(options) {
+    const result = await super.close(options);
+    if (this.#coreChanged) {
+      this.#coreChanged = false;
+      await foundry.applications.settings.SettingsConfig.reloadConfirm({ world: true });
+    }
+    return result;
   }
 }

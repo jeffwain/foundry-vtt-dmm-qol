@@ -1,17 +1,20 @@
 /**
  * Applying the chosen fonts in the game view.
  *
- * Enabled fonts go into CONFIG.fontDefinitions at init, so Foundry loads them
- * before the canvas draws (and into every popped-out window it opens). The
- * sheet-header and pause-caption fonts are CSS in one <style> element, kept in
- * sync across the main page and any popped-out windows. Token nameplates are
- * canvas text, so they get their font from a refreshToken hook instead.
+ * Fonts in use go into CONFIG.fontDefinitions at setup, so Foundry loads them
+ * before the canvas draws (and into every popped-out window it opens). Every
+ * client waits for each one, so unused fonts stay out, and so do fonts in
+ * core's own font list, which core loads itself. The sheet-header and
+ * pause-caption fonts are CSS in one <style> element, kept in sync across
+ * the main page and any popped-out windows. Token nameplates are canvas
+ * text, so they get their font from a refreshToken hook instead.
  */
 
 import CONSTANTS from "../shared/constants.js";
 import { KEYS } from "./keys.js";
 import { refitNames } from "./fit-name.js";
-import { characterFamily, characterFonts, fontDefinitionsFor, fontRulesCss } from "./render.js";
+import { changedFontActors, characterFamily, characterFonts, definitionsToRegister, fontDefinitionsFor, fontRulesCss } from "./render.js";
+import { KEYS as X_CARD_KEYS } from "../x-card/keys.js";
 
 const MODULE = CONSTANTS.MODULE_NAME;
 const STYLE_ID = "dmm-fonts-rules";
@@ -20,23 +23,35 @@ const STYLE_ID = "dmm-fonts-rules";
 const added = new Set();
 
 /** Settings snapshot used on every nameplate refresh, rebuilt when settings change. */
-let state = { characters: {}, families: new Set() };
+let state = { characters: {}, families: new Set(), register: new Map() };
+
+/** Families in core's font list (Configure Settings > Font Configuration). */
+export function coreFamilies() {
+  return new Set(Object.keys(game.settings.get("core", "fonts") ?? {}));
+}
 
 function readState() {
-  const definitions = fontDefinitionsFor(game.settings.get(MODULE, KEYS.ENABLED));
+  const get = (key) => game.settings.get(MODULE, key);
+  const definitions = fontDefinitionsFor(get(KEYS.ENABLED));
   const families = new Set(definitions.keys());
-  state = {
-    definitions,
+  const fallback = get(KEYS.CHARACTER_DEFAULT) ?? "";
+  // Resolved here so the sheet rules and nameplates both see the default font.
+  const characters = characterFonts({
+    characters: get(KEYS.CHARACTERS) ?? {},
+    // game.actors does not exist yet at init; the ready read fills these in.
+    characterIds: game.actors?.filter((actor) => actor.type === "character").map((actor) => actor.id) ?? [],
+    fallback,
     families,
-    // Resolved here so the sheet rules and nameplates both see the default font.
-    characters: characterFonts({
-      characters: game.settings.get(MODULE, KEYS.CHARACTERS) ?? {},
-      // game.actors does not exist yet at init; the ready read fills these in.
-      characterIds: game.actors?.filter((actor) => actor.type === "character").map((actor) => actor.id) ?? [],
-      fallback: game.settings.get(MODULE, KEYS.CHARACTER_DEFAULT) ?? "",
-      families,
-    }),
-    pause: game.settings.get(MODULE, KEYS.PAUSE) ?? "",
+  });
+  const pause = get(KEYS.PAUSE) ?? "";
+  // X-Card fonts are only needed while its button is on.
+  const xCard = get(X_CARD_KEYS.ENABLED) ? (get(KEYS.X_CARD) ?? []) : [];
+  state = {
+    families,
+    // The default is passed on its own: at setup no character has it yet.
+    register: definitionsToRegister(definitions, { characters, fallback, pause, xCard, core: coreFamilies() }),
+    characters,
+    pause,
   };
 }
 
@@ -50,7 +65,7 @@ function hostDocuments() {
 }
 
 /**
- * Sync CONFIG.fontDefinitions with the enabled list.
+ * Sync CONFIG.fontDefinitions with the fonts to register.
  * A family core already defines is left alone, so a stray "Signika.woff2"
  * cannot replace Foundry's own Signika.
  *
@@ -59,11 +74,11 @@ function hostDocuments() {
 function syncDefinitions() {
   const fresh = [];
   for (const family of added) {
-    if (state.families.has(family)) continue;
+    if (state.register.has(family)) continue;
     delete CONFIG.fontDefinitions[family];
     added.delete(family);
   }
-  for (const [family, definition] of state.definitions) {
+  for (const [family, definition] of state.register) {
     if (family in CONFIG.fontDefinitions) continue;
     CONFIG.fontDefinitions[family] = definition;
     added.add(family);
@@ -72,7 +87,10 @@ function syncDefinitions() {
   return fresh;
 }
 
-/** Register enabled fonts. Called at init; Foundry loads them itself before the canvas. */
+/**
+ * Register the fonts in use. Called at setup, once every feature's settings
+ * exist (the X-Card registers last); Foundry loads them itself before the canvas.
+ */
 export function registerFontDefinitions() {
   readState();
   syncDefinitions();
@@ -91,17 +109,38 @@ function applyRules() {
   }
 }
 
-function refreshNameplates() {
+/** Whether a character has an enabled font assigned. */
+export function hasCharacterFont(actorId) {
+  return Boolean(characterFamily(state.characters, actorId, state.families));
+}
+
+/**
+ * Redraw the nameplates of tokens whose actor passes `test`. Each redraw
+ * rebuilds the text texture, so tokens without a custom font are skipped.
+ */
+function refreshNameplates(test) {
   for (const token of canvas?.tokens?.placeables ?? []) {
-    token.renderFlags.set({ refreshNameplate: true });
+    if (test(token.actor?.id)) token.renderFlags.set({ refreshNameplate: true });
   }
 }
 
-/** First paint, once the world is ready. */
+/**
+ * A font that missed core's 4.5 s wait at load arrives later; redraw the
+ * nameplates that use it. Font Face family names can come back quoted.
+ */
+function onFontsLoaded(event) {
+  const loaded = new Set(event.fontfaces.map((face) => face.family.replace(/^["']|["']$/g, "")));
+  refreshNameplates((id) => loaded.has(characterFamily(state.characters, id, state.families)));
+}
+
+/**
+ * Once the world is ready. The canvas first drew with the fonts registered at
+ * setup, so only the style rules are new here.
+ */
 export function applyFonts() {
   readState();
   applyRules();
-  refreshNameplates();
+  document.fonts?.addEventListener("loadingdone", onFontsLoaded);
 }
 
 /**
@@ -109,6 +148,7 @@ export function applyFonts() {
  * re-apply rules and nameplates.
  */
 async function refresh() {
+  const before = state;
   readState();
   const fresh = syncDefinitions();
   const { FontConfig } = foundry.applications.settings.menus;
@@ -117,14 +157,23 @@ async function refresh() {
   );
   applyRules();
   // A new font changes how wide each name is.
-  refitNames(hostDocuments());
-  refreshNameplates();
+  refitNames();
+  const changed = changedFontActors(before, state);
+  if (changed.size) refreshNameplates((id) => changed.has(id));
 }
 
 /** Saving the dialog writes several settings in a row; refresh once. */
 export const scheduleRefresh = foundry.utils.debounce(() => {
   refresh().catch((err) => console.error("dmm-quality-of-life | fonts: refresh failed", err));
 }, 100);
+
+/**
+ * createSetting / updateSetting hook. A font joining or leaving core's list
+ * changes which fonts this module registers itself.
+ */
+export function onSettingChange(setting) {
+  if (setting.key === "core.fonts") scheduleRefresh();
+}
 
 /**
  * createActor / deleteActor hook. The default font's rules list every

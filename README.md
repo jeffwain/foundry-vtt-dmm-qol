@@ -64,7 +64,7 @@ I appreciated Token Variant Art's quick application UI for token images, but I d
 
 ### Better Custom Fonts
 
-Set up a Data folder for fonts, then apply them to Tidy sheet headers, token nameplates on the canvas, the pause caption, and the X-Card option.
+Set up a Data folder for fonts, then apply them to Tidy sheet headers, token nameplates on the canvas, the pause caption, and the X-Card option. You can then either apply them to the custom UI tweaks here or sync two-way with core's font settings!
 
 ### Customize Sidebar Tabs
 
