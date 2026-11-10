@@ -1,6 +1,8 @@
 # Publishing a GitHub release (tag it like v1.2.3) builds the module and
 # attaches module.json and module.zip to that release. Foundry installs and
 # updates from the manifest URL; nothing is sent to foundryvtt.com.
+#
+# Publish from the GitHub UI, or from a terminal with npm run release.
 
 name: Release
 
@@ -24,11 +26,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: lts/*
-          cache: npm
 
-      - run: npm ci
+      - run: if [ -f package-lock.json ]; then npm ci; fi
 
-      - run: npm run verify
+      - run: npm run verify --if-present
 
       - run: npm run build -- "$TAG"
 
@@ -38,3 +39,19 @@ jobs:
       - name: Attach to the release
         run: gh release upload "$TAG" dist/module.json dist/module.zip --clobber
 
+      # This version's manifest, for installing or pinning it directly. npm run
+      # release leaves a <!-- manifest --> marker below your own notes; without
+      # one (a release made on GitHub) the link goes at the top. Skipped if the
+      # notes already have it, so re-running the job doesn't repeat it.
+      - name: Add the manifest link to the release notes
+        run: |
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/module.json"
+          link="**Manifest:** $url"
+          marker="<!-- manifest -->"
+          body=$(gh release view "$TAG" --json body --jq .body)
+          case "$body" in
+            *"$url"*) exit 0 ;;
+            *"$marker"*) notes="${body/"$marker"/$link}" ;;
+            *) notes=$(printf '%s\n\n%s' "$link" "$body") ;;
+          esac
+          gh release edit "$TAG" --notes "$notes"

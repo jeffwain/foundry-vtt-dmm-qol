@@ -1,6 +1,7 @@
 # Dependencies and release build output (npm run build)
 node_modules/
 dist/
+module.zip
 
 # Foundry writes this while the module folder is in use
 /dmm-quality-of-life.lock
