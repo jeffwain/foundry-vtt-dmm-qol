@@ -373,8 +373,8 @@ async function main(argv) {
 
   const repo = repoSlug(tryRead("git", ["remote", "get-url", "origin"]), manifest.url);
   console.log(`\nReleased ${tag}.`);
+  console.log(`  Manifest:     https://github.com/${repo}/releases/latest/download/module.json`);
   console.log(`  This version: https://github.com/${repo}/releases/download/${tag}/module.json`);
-  console.log(`  Latest:       https://github.com/${repo}/releases/latest/download/module.json`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
