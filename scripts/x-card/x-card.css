@@ -52,11 +52,12 @@
     text-shadow: 0 0.125rem 0.75rem var(--x-card-shadow);
   }
 
+  /* The SVG is a mask, so the fill comes from the same color as the font X. */
   .x-card-image {
+    inline-size: calc(var(--x-card-size) * 0.8);
     block-size: calc(var(--x-card-size) * 0.8);
-    max-inline-size: 80vw;
-    border: none;
-    object-fit: contain;
+    background-color: var(--x-card-fill, var(--x-card-color));
+    mask: url("../../assets/x-card.svg") center / contain no-repeat;
     filter: drop-shadow(0 0.125rem 0.75rem var(--x-card-shadow));
   }
 }

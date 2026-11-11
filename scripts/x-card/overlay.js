@@ -16,7 +16,6 @@ import { cardFamilies, nextFamily, pickStart } from "./cycle.js";
 const MODULE = CONSTANTS.MODULE_NAME;
 const SOCKET = `module.${MODULE}`;
 const OVERLAY_ID = "dmm-x-card";
-const IMAGE = `modules/${MODULE}/assets/x-card.svg`;
 
 /** How long each font stays up, and how long the crossfade between them takes. */
 const STEP_MS = 1200;
@@ -31,9 +30,21 @@ let card = null;
 /** Last opening font on this client, so the next press opens on a different one. */
 let lastStart = "";
 
+/**
+ * The fonts to cycle: those ticked for the X-Card whose Custom box is on.
+ * Core's font list plays no part. The enabled list is only resolved when the
+ * Fonts dialog renders, so until it has been, "on" means "not switched off".
+ */
 function families() {
-  const enabled = new Set(fontDefinitionsFor(game.settings.get(MODULE, FONT_KEYS.ENABLED)).keys());
-  return cardFamilies(game.settings.get(MODULE, FONT_KEYS.X_CARD), enabled);
+  const enabledPaths = game.settings.get(MODULE, FONT_KEYS.ENABLED);
+  const enabled = enabledPaths?.length
+    ? new Set(fontDefinitionsFor(enabledPaths).keys())
+    : null;
+  const ticked = game.settings.get(MODULE, FONT_KEYS.X_CARD);
+  if (enabled) return cardFamilies(ticked, enabled);
+  const off = fontDefinitionsFor(game.settings.get(MODULE, FONT_KEYS.DISABLED)).keys();
+  const switchedOff = new Set(off);
+  return (Array.isArray(ticked) ? ticked : []).filter((family) => !switchedOff.has(family));
 }
 
 function reducedMotion() {
@@ -60,9 +71,10 @@ function buildOverlay(family) {
     mark = element("div", "x-card-mark", game.i18n.localize("X-CARD.symbol"));
     mark.style.fontFamily = `"${family}"`;
   } else {
-    mark = element("img", "x-card-image");
-    mark.src = IMAGE;
-    mark.alt = game.i18n.localize("X-CARD.symbol");
+    // A div, not an img: x-card.css paints the SVG as a mask in the card's color.
+    mark = element("div", "x-card-image");
+    mark.setAttribute("role", "img");
+    mark.setAttribute("aria-label", game.i18n.localize("X-CARD.symbol"));
   }
 
   overlay.append(mark);
