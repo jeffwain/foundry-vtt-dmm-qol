@@ -5,7 +5,8 @@
   "authors": [
     {
       "name": "jeffwain",
-      "url": "https://github.com/jeffwain/"
+      "url": "https://github.com/jeffwain/",
+      "flags": {}
     }
   ],
   "license": "LICENSE",
@@ -18,29 +19,52 @@
     "scripts/module.js"
   ],
   "styles": [
-    "scripts/shared/dmm-styles.css",
-    "scripts/token-images/token-images.css",
-    "scripts/sidebar-tabs/sidebar-tabs.css",
-    "scripts/settings-pane/settings-pane.css",
-    "scripts/player-folders/player-folders.css",
-    "scripts/landing/landing-config.css",
-    "scripts/fonts/fonts-config.css",
-    "scripts/x-card/x-card.css",
-    "scripts/group-rolls/group-rolls.css",
-    "scripts/css-tweaks/css-tweaks.css",
-    "scripts/token-hud/token-hud.css"
+    {
+      "src": "scripts/shared/dmm-styles.css"
+    },
+    {
+      "src": "scripts/token-images/token-images.css"
+    },
+    {
+      "src": "scripts/sidebar-tabs/sidebar-tabs.css"
+    },
+    {
+      "src": "scripts/settings-pane/settings-pane.css"
+    },
+    {
+      "src": "scripts/player-folders/player-folders.css"
+    },
+    {
+      "src": "scripts/landing/landing-config.css"
+    },
+    {
+      "src": "scripts/fonts/fonts-config.css"
+    },
+    {
+      "src": "scripts/x-card/x-card.css"
+    },
+    {
+      "src": "scripts/group-rolls/group-rolls.css"
+    },
+    {
+      "src": "scripts/css-tweaks/css-tweaks.css"
+    },
+    {
+      "src": "scripts/token-hud/token-hud.css"
+    }
   ],
   "languages": [
     {
       "lang": "en",
       "name": "English",
-      "path": "languages/en.json"
+      "path": "languages/en.json",
+      "flags": {}
     }
   ],
   "socket": true,
   "url": "https://github.com/jeffwain/foundry-vtt-dmm-qol",
   "manifest": "https://github.com/jeffwain/foundry-vtt-dmm-qol/releases/latest/download/module.json",
-  "download": "https://github.com/jeffwain/foundry-vtt-dmm-qol/releases/latest/download/module.zip",
+  "download": "https://github.com/jeffwain/foundry-vtt-dmm-qol/releases/download/v1.1.1/module.zip",
   "bugs": "https://github.com/jeffwain/foundry-vtt-dmm-qol/issues",
   "flags": {
     "canUpload": true

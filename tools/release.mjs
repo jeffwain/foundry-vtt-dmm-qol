@@ -31,10 +31,17 @@
  *     "workflow": "release.yml",
  *     "editor": "zed --wait",
  *     "notes": "release-notes.md",
- *     "files": ["README.md", "module", "styles"]
+ *     "files": ["README.md", "module", "styles"],
+ *     "systems": ["dnd5e"]
  *   }
  *
  * Commands may use {tag} (v1.2.3) and {version} (1.2.3).
+ *
+ * Before the checks run, it shows module.json's Foundry compatibility and each
+ * system's (relationships.systems) and asks whether to change them. The
+ * systems are the ones module.json already names, or "systems" in
+ * release.config.json. Foundry versions look like 14 or 14.360; system
+ * versions like 6.1.0, or 6.1.x for a maximum. --yes skips these questions.
  *
  * The editor is release.config.json's, then RELEASE_EDITOR, VISUAL, EDITOR,
  * git's core.editor, then Zed or VS Code if installed. Zed and VS Code get
@@ -110,6 +117,70 @@ export function setManifestVersion(json, version) {
   const pattern = /("version"\s*:\s*")[^"]*(")/;
   if (!pattern.test(json)) throw new Error('module.json has no "version" field.');
   return json.replace(pattern, `$1${version}$2`);
+}
+
+/* -- compatibility -- */
+
+/** Foundry's own order for a compatibility block. */
+export const COMPAT_FIELDS = ["minimum", "verified", "maximum"];
+
+/** Foundry versions are a generation, optionally with a build: "14" or "14.360". */
+export const FOUNDRY_VERSION = /^\d+(\.\d+)?$/;
+
+/** System versions; "x" lets a maximum cover every patch, like "6.1.x". */
+export const SYSTEM_VERSION = /^\d+(\.(\d+|x)){0,2}$/i;
+
+/** "minimum 14, verified 14.360", or "not set". */
+export function describeCompat(compat) {
+  const parts = COMPAT_FIELDS.filter((f) => compat?.[f]).map((f) => `${f} ${compat[f]}`);
+  return parts.length ? parts.join(", ") : "not set";
+}
+
+/**
+ * Reads one compatibility field from the prompt. Enter keeps the current
+ * value, "-" clears it. Returns { value } or null if it isn't a version.
+ */
+export function compatAnswer(answer, current, pattern) {
+  const raw = String(answer ?? "").trim();
+  if (!raw) return { value: current };
+  if (raw === "-") return { value: undefined };
+  return pattern.test(raw) ? { value: raw } : null;
+}
+
+/** The systems to ask about: release.config.json's list, else the ones module.json names. */
+export function systemIds(manifest, configured) {
+  return configured ?? (manifest.relationships?.systems ?? []).map((s) => s.id);
+}
+
+const orderedCompat = (compat) =>
+  Object.fromEntries(COMPAT_FIELDS.filter((f) => compat[f]).map((f) => [f, compat[f]]));
+
+/**
+ * Returns a copy of the manifest with new compatibility ranges.
+ * @param {{foundry?: object, systems?: Record<string, object>}} changes
+ *   Each value is the full new range; fields left out are removed.
+ */
+export function setCompatibility(manifest, { foundry, systems = {} }) {
+  const out = structuredClone(manifest);
+  if (foundry) out.compatibility = orderedCompat(foundry);
+  if (!Object.keys(systems).length) return out;
+
+  const relationships = out.relationships ?? {};
+  const list = relationships.systems ?? [];
+  for (const [id, range] of Object.entries(systems)) {
+    const entry = list.find((s) => s.id === id) ?? list[list.push({ id }) - 1];
+    const compat = orderedCompat(range);
+    if (Object.keys(compat).length) entry.compatibility = compat;
+    else delete entry.compatibility;
+  }
+  relationships.systems = list;
+  if (out.relationships) return out;
+
+  // New relationships block: put it next to compatibility, where people look for it.
+  const entries = Object.entries(out);
+  const at = entries.findIndex(([key]) => key === "compatibility") + 1 || entries.length;
+  entries.splice(at, 0, ["relationships", relationships]);
+  return Object.fromEntries(entries);
 }
 
 /* -- release notes -- */
@@ -329,6 +400,42 @@ async function editNotes(cfg, file, version, released, commitsText, { noEdit }) 
   return finished.notes;
 }
 
+/**
+ * Shows the Foundry and system ranges in module.json and asks, one at a time,
+ * whether to change them. Returns the changes for setCompatibility.
+ */
+async function askCompatibility(manifest, systems) {
+  const entries = [
+    { label: "Foundry", pattern: FOUNDRY_VERSION, example: "14 or 14.360", current: manifest.compatibility ?? {} },
+    ...systems.map((id) => ({
+      id, label: id, pattern: SYSTEM_VERSION, example: "6.1.0 or 6.1.x",
+      current: manifest.relationships?.systems?.find((s) => s.id === id)?.compatibility ?? {},
+    })),
+  ];
+  const width = Math.max(...entries.map((e) => e.label.length));
+  console.log("\nCompatibility in module.json:");
+  for (const e of entries) console.log(`  ${e.label.padEnd(width)}  ${describeCompat(e.current)}`);
+
+  const changes = { systems: {} };
+  for (const e of entries) {
+    if ((await ask(`Update ${e.label}? [y/N] `)).toLowerCase() !== "y") continue;
+    console.log("  Enter keeps the value in brackets; - clears it.");
+    const range = {};
+    for (const field of COMPAT_FIELDS) {
+      let result = null;
+      while (!result) {
+        result = compatAnswer(await ask(`  ${field} [${e.current[field] ?? "none"}]: `), e.current[field], e.pattern);
+        if (!result) console.log(`  Not a version like ${e.example}.`);
+      }
+      range[field] = result.value;
+    }
+    console.log(`  ${e.label}: ${describeCompat(range)}`);
+    if (e.id) changes.systems[e.id] = range;
+    else changes.foundry = range;
+  }
+  return changes;
+}
+
 async function main(argv) {
   const dryRun = argv.includes("--dry-run");
   const yes = argv.includes("--yes");
@@ -387,6 +494,11 @@ async function main(argv) {
   }
   if (released.has(version)) fail(`${tag} already exists on GitHub.`);
 
+  // Ranges go in the same Release commit as the version. --yes keeps them as they are.
+  const compat = yes ? {} : await askCompatibility(manifest, systemIds(manifest, cfg.systems));
+  const compatChanged = JSON.stringify(setCompatibility(manifest, compat)) !== JSON.stringify(manifest);
+  const setWhat = compatChanged ? `module.json to ${version} with the new compatibility` : `module.json to ${version}`;
+
   if (cfg.verify) {
     console.log(`\n> ${cfg.verify}`);
     if (!run(cfg.verify)) fail("Checks failed. Nothing released.");
@@ -406,19 +518,23 @@ async function main(argv) {
   console.log(notes ? `\nNotes for ${tag}:\n${notes.replace(/^/gm, "  | ")}` : `\nNo notes for ${tag}; just the generated ones.`);
 
   if (dryRun) {
-    console.log(`\nDry run: would set module.json to ${version}, commit "Release ${tag}", push and publish.`);
+    console.log(`\nDry run: would set ${setWhat}, commit "Release ${tag}", push and publish.`);
     console.log(`${cfg.notes} keeps the "# ${tag}" section; the next run picks it up again.`);
     return;
   }
 
-  const question = `\nSet module.json to ${version}, commit "Release ${tag}", push to ${cfg.branch} and publish? [y/N] `;
+  const question = `\nSet ${setWhat}, commit "Release ${tag}", push to ${cfg.branch} and publish? [y/N] `;
   if (!yes && (await ask(question)).toLowerCase() !== "y") {
     console.log(`Cancelled. Your notes are saved in ${cfg.notes}.`);
     return;
   }
 
   const manifestText = readText(manifestFile);
-  writeText(manifestFile, setManifestVersion(manifestText, version), manifestText);
+  // Only reformat module.json when a range changed; a version bump keeps its layout.
+  const withCompat = compatChanged
+    ? `${JSON.stringify(setCompatibility(JSON.parse(manifestText), compat), null, 2)}\n`
+    : manifestText;
+  writeText(manifestFile, setManifestVersion(withCompat, version), manifestText);
   if (!git("add", "--", "module.json", cfg.notes) || !git("commit", "-m", `Release ${tag}`)) {
     fail("Commit failed. module.json and the notes are changed but not committed; nothing released.");
   }

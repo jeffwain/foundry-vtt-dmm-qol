@@ -1,7 +1,7 @@
 /**
  * GM hover HP tab.
  *
- * Hovering a token shows a small tab with its HP (bar1) in the token's bottom
+ * Hovering a token shows a small tab with its HP (see hp-bar.js) in the token's bottom
  * right corner (centred on the grid intersection), clear of a nameplate that
  * also shows on hover.
  * Clicking the tab opens the token HUD as a right-click would, with the tab
@@ -9,6 +9,7 @@
  */
 
 import { getHudSettings } from "./settings.js";
+import { hpBarAttribute, whenHpInput } from "./hp-bar.js";
 
 const HIDE_DELAY = 250;
 const TAKEOVER_DELAY = 150;
@@ -25,7 +26,7 @@ function eligible(token) {
   if (!game.user.isGM || !getHudSettings().hover || !canvas?.ready) return false;
   if (!token?.document || token.isPreview || token.hasActiveHUD) return false;
   if (token.mouseInteractionManager?.isDragging) return false;
-  const bar = token.document.getBarAttribute("bar1");
+  const bar = hpBarAttribute(token.document);
   return bar != null && bar.value != null;
 }
 
@@ -59,7 +60,7 @@ function show(token) {
   const el = ensureTab();
   if (!el) return;
   current = token;
-  el.textContent = String(token.document.getBarAttribute("bar1").value);
+  el.textContent = String(hpBarAttribute(token.document).value);
 
   // Anchored on the token's bottom right corner (a grid intersection); the CSS
   // centres the tab on that point.
@@ -114,15 +115,16 @@ async function openHud(ev) {
   if (!token?.layer) return;
   token.control({ releaseOthers: true });
   await canvas.tokens.hud.bind(token);
-  if (from) animateOpen(from);
-  focusHp(canvas.tokens.hud.element);
+  whenHpInput(canvas.tokens.hud.element, token.document, (input) => {
+    if (from) animateOpen(input, from);
+    focusHp(input);
+  });
 }
 
 /** Put the cursor in the HP box, selected, so a value can be typed at once. */
-function focusHp(hud) {
-  const input = hud?.querySelector(".attribute.bar1 input");
-  input?.focus({ preventScroll: true });
-  input?.select();
+function focusHp(input) {
+  input.focus({ preventScroll: true });
+  input.select();
 }
 
 /** Token whose HUD already got its focus, so re-renders don't repeat it. */
@@ -136,17 +138,20 @@ function onOpenHud(hud, html) {
   focusedFor = id;
   // The right click is still finishing and the HUD may not be in the page yet,
   // so wait two frames or the focus is lost.
-  requestAnimationFrame(() => requestAnimationFrame(() => focusHp(html)));
+  const doc = hud.object?.document;
+  requestAnimationFrame(() => requestAnimationFrame(() => whenHpInput(html, doc, focusHp)));
 }
 
 /** Grow the HP box out of the tab and scale the columns out from the token. */
-function animateOpen(from) {
+function animateOpen(input, from) {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
   const hud = canvas.tokens.hud.element;
   if (!hud) return;
   const options = { duration: OPEN_MS, easing: "ease-out" };
 
-  const bar = hud.querySelector(".attribute.bar1");
+  // Bar Brawl can stack several inputs in one box; grow just the HP one then.
+  const box = input.closest(".attribute");
+  const bar = box?.querySelectorAll("input").length === 1 ? box : input;
   const to = bar?.getBoundingClientRect();
   if (to?.width && to.height && bar.offsetWidth) {
     // The keyframe transform applies inside the bar's own scale, so convert

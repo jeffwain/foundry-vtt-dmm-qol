@@ -147,8 +147,7 @@ export function registerSettings(onChange) {
     default: {},
     onChange: handleChange,
   });
-
-  readSettings();
+  // No read here: game.user is still null during init. getHudSettings reads on first use.
 }
 
 /** @returns {{enabled: boolean, buttonScale: number, response: number, floor: number, oneByOne: boolean, hover: boolean, hoverMenus: boolean, focusHp: boolean}} */

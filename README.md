@@ -29,6 +29,8 @@ I find that the Token HUD in Foundry is one of the most neglected pieces of the 
 
 This is a replacement for [Illandril's Token HUD Scale](https://github.com/illandril/FoundryVTT-token-hud-scale) in v14. Don't run both, and make sure Custom D&D 5e's Token HUD Improvements setting is off.
 
+Works with [Bar Brawl](https://gitlab.com/woodentavern/foundryvtt-bar-brawl): the HP tab and HP focus use whichever Bar Brawl bar tracks HP, not just bar1.
+
 | Setting | Effect |
 |---|---|
 | **HUD Button Scale** | Size of the HUD buttons relative to Foundry's default. |

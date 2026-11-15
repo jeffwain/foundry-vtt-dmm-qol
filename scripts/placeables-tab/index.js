@@ -2,7 +2,8 @@
  * Placeables Tab — extra clicks for the entries in core's Placeables sidebar tab.
  *
  * - Click an entry to centre the canvas on it, keeping the current zoom.
- * - Middle-click an entry to open its sheet without waiting on a double-click.
+ * - Middle-click an entry to open its sheet: a token's actor sheet, or the
+ *   config for other placeables (what core's double-click opens for all).
  *
  * Centre-on-click wraps core's PlaceableTab entry handler, so it adds no
  * listeners of its own. Middle-click needs real listeners; they go on the
@@ -59,8 +60,19 @@ function listenForMiddleClick(directory) {
     const tab = directory.tab;
     if (!tab) return;
     event.preventDefault();
-    tab._onConfigureEntry(event, event.target);
+    openSheet(tab, event.target);
   });
+}
+
+/**
+ * A token's own sheet is its config, the same as core's double-click, so open
+ * its actor's sheet instead. Other placeables have no sheet but their config.
+ */
+function openSheet(tab, target) {
+  const doc = tab._getPlaceableFromElement(target);
+  const actorSheet = doc?.documentName === "Token" ? doc.actor?.sheet : null;
+  if (actorSheet && doc.actor.testUserPermission(game.user, "LIMITED")) return actorSheet.render({ force: true });
+  return tab._onConfigureEntry(null, target);
 }
 
 function patchPlaceableDirectory() {

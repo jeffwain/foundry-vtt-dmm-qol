@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import {
   bump, compareVersions, baseVersion, resolveVersion, fill, setManifestVersion,
   parseNotes, draftNotes, finishNotes, releaseBody, pickEditor, config, MANIFEST_MARKER,
-  parseCommits, formatCommits,
+  parseCommits, formatCommits, describeCompat, compatAnswer, systemIds, setCompatibility,
+  FOUNDRY_VERSION, SYSTEM_VERSION,
 } from "./release.mjs";
 
 test("bump raises the chosen part and resets the ones below it", () => {
@@ -175,4 +176,72 @@ test("config prefers npm scripts, falls back to repo files, and lets overrides w
   assert.deepEqual(custom, {
     branch: "release", verify: null, build: "make {tag}", workflow: "release.yml", editor: null, notes: "release-notes.md",
   });
+});
+
+test("describeCompat lists the fields that are set, in Foundry's order", () => {
+  assert.equal(describeCompat({ verified: "14", minimum: "13" }), "minimum 13, verified 14");
+  assert.equal(describeCompat({ minimum: "6.1.0", maximum: "6.1.x" }), "minimum 6.1.0, maximum 6.1.x");
+  assert.equal(describeCompat({}), "not set");
+  assert.equal(describeCompat(undefined), "not set");
+});
+
+test("compatAnswer keeps on Enter, clears on -, and rejects what isn't a version", () => {
+  assert.deepEqual(compatAnswer("", "14", FOUNDRY_VERSION), { value: "14" });
+  assert.deepEqual(compatAnswer("  ", undefined, FOUNDRY_VERSION), { value: undefined });
+  assert.deepEqual(compatAnswer("-", "14", FOUNDRY_VERSION), { value: undefined });
+  assert.deepEqual(compatAnswer("14.360", "14", FOUNDRY_VERSION), { value: "14.360" });
+  assert.equal(compatAnswer("14.360.1", "14", FOUNDRY_VERSION), null, "Foundry builds have two parts");
+  assert.equal(compatAnswer("v14", "14", FOUNDRY_VERSION), null);
+  assert.deepEqual(compatAnswer("6.1.x", undefined, SYSTEM_VERSION), { value: "6.1.x" });
+  assert.deepEqual(compatAnswer("6", undefined, SYSTEM_VERSION), { value: "6" });
+  assert.equal(compatAnswer("latest", undefined, SYSTEM_VERSION), null);
+});
+
+test("systemIds takes the systems module.json already names, or the configured list", () => {
+  const manifest = { relationships: { systems: [{ id: "dnd5e" }, { id: "pf2e" }] } };
+  assert.deepEqual(systemIds(manifest), ["dnd5e", "pf2e"]);
+  assert.deepEqual(systemIds(manifest, ["dnd5e"]), ["dnd5e"]);
+  assert.deepEqual(systemIds({}), []);
+});
+
+test("setCompatibility updates Foundry and an existing system, leaving the rest alone", () => {
+  const manifest = {
+    id: "x",
+    compatibility: { minimum: "13", verified: "13" },
+    relationships: {
+      systems: [{ id: "dnd5e", manifest: "https://example.com/system.json", compatibility: { minimum: "5.0.0" } }],
+      requires: [{ id: "lib-wrapper" }],
+    },
+    url: "u",
+  };
+  const out = setCompatibility(manifest, {
+    foundry: { minimum: "14", verified: "14.360" },
+    systems: { dnd5e: { verified: "6.1.0", minimum: "6.0.0" } },
+  });
+  assert.deepEqual(out.compatibility, { minimum: "14", verified: "14.360" });
+  assert.deepEqual(out.relationships.systems, [
+    { id: "dnd5e", manifest: "https://example.com/system.json", compatibility: { minimum: "6.0.0", verified: "6.1.0" } },
+  ]);
+  assert.deepEqual(out.relationships.requires, [{ id: "lib-wrapper" }]);
+  assert.deepEqual(Object.keys(out), ["id", "compatibility", "relationships", "url"]);
+  assert.deepEqual(manifest.compatibility, { minimum: "13", verified: "13" }, "input not mutated");
+});
+
+test("setCompatibility adds a missing system right after compatibility", () => {
+  const out = setCompatibility(
+    { id: "x", compatibility: { minimum: "14" }, esmodules: [] },
+    { systems: { dnd5e: { minimum: "6.1.0", verified: "6.1.0" } } },
+  );
+  assert.deepEqual(Object.keys(out), ["id", "compatibility", "relationships", "esmodules"]);
+  assert.deepEqual(out.relationships, { systems: [{ id: "dnd5e", compatibility: { minimum: "6.1.0", verified: "6.1.0" } }] });
+});
+
+test("setCompatibility drops cleared fields and leaves untouched entries as they are", () => {
+  const manifest = { compatibility: { minimum: "14", verified: "14", maximum: "14" } };
+  assert.deepEqual(setCompatibility(manifest, { foundry: { minimum: "14", verified: "14" } }).compatibility,
+    { minimum: "14", verified: "14" });
+  assert.deepEqual(setCompatibility(manifest, {}), manifest);
+  const cleared = setCompatibility({ relationships: { systems: [{ id: "dnd5e", compatibility: { minimum: "6" } }] } },
+    { systems: { dnd5e: {} } });
+  assert.deepEqual(cleared.relationships.systems, [{ id: "dnd5e" }], "still requires the system, no version range");
 });
