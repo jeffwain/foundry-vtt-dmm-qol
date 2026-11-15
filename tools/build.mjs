@@ -60,10 +60,12 @@ export function releaseManifest(source, { version, repo, tag = `v${version}` }) 
 
 /** Every file a manifest asks Foundry to load, for checking they exist. */
 export function manifestFiles(manifest) {
+  // Entries are paths, or { src } objects once Foundry has saved module.json.
+  const paths = (list) => (list ?? []).map((entry) => (typeof entry === "string" ? entry : entry.src));
   return [
-    ...(manifest.esmodules ?? []),
-    ...(manifest.scripts ?? []),
-    ...(manifest.styles ?? []),
+    ...paths(manifest.esmodules),
+    ...paths(manifest.scripts),
+    ...paths(manifest.styles),
     ...(manifest.languages ?? []).map((lang) => lang.path),
   ];
 }

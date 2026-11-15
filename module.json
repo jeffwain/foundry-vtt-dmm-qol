@@ -13,7 +13,19 @@
   "version": "1.1.1",
   "compatibility": {
     "minimum": "14",
-    "verified": "14"
+    "verified": "14.370"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "compatibility": {
+          "minimum": "6.0.6",
+          "verified": "6.1.x",
+          "maxiumum": "6.1.x"
+        }
+      }
+    ]
   },
   "esmodules": [
     "scripts/module.js"

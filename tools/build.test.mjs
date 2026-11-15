@@ -44,6 +44,14 @@ test("manifestFiles lists scripts, styles and language files", () => {
   assert.deepEqual(files, ["module/main.mjs", "a.css", "languages/en.json"]);
 });
 
+test("manifestFiles reads the { src } entries Foundry writes when it saves module.json", () => {
+  const files = manifestFiles({
+    esmodules: [{ src: "module/main.mjs" }],
+    styles: [{ src: "a.css" }, "b.css", { src: "c.css", layer: "modules" }],
+  });
+  assert.deepEqual(files, ["module/main.mjs", "a.css", "b.css", "c.css"]);
+});
+
 test("packageEntries includes standard paths plus custom manifest roots, or uses configured list", () => {
   const entries = packageEntries({ esmodules: ["./src/main.mjs"] });
   assert.ok(entries.includes("README.md"));
