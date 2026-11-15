@@ -1,3 +1,10 @@
+# v1.1.2
+
+- Improve the build process!
+- Fix Token HUD reading game.user during init.
+- Fixed sidebar middle click not opening the source sheet.
+- Added checks for the presence of multiple resource bars on a token.
+
 # v1.1.1
 
 Fixed broken font loading for the X-Card, updated module.json to use /latest release link.
