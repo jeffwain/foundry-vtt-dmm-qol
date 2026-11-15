@@ -5,7 +5,7 @@
  *   npm run release                  asks patch / minor / major
  *   npm run release -- minor         skips the question
  *   npm run release -- 1.2.0         exact version
- *   npm run release -- --dry-run     checks, build and notes only; no commit, no release
+ *   npm run release -- --dry-run     writes module.json, notes and dist/ for testing; no commit, no release
  *   npm run release -- --no-edit     use the notes as they are, don't open the editor
  *
  * Release notes live in release-notes.md, newest first, one "# vX.Y.Z" heading
@@ -15,10 +15,14 @@
  * what's under that heading when you close it becomes the release notes,
  * above the manifest link and GitHub's generated change list.
  *
- * Publishing sets module.json's version, commits module.json and
- * release-notes.md as "Release vX.Y.Z", pushes, and releases that commit.
+ * Every run, dry or not, sets module.json's version and ranges before the
+ * checks, so the build and local testing use them. Publishing then commits
+ * module.json and release-notes.md as "Release vX.Y.Z", pushes, and releases
+ * that commit. A dry run stops before the commit and leaves both files
+ * changed; the next run accepts them, as long as module.json differs from the
+ * committed one only in its version and ranges.
  * Foundry only offers an update when the version goes up, so the new version
- * must be higher than both the latest release and module.json.
+ * must be higher than both the latest release and the committed module.json.
  *
  * The same file works in every module repo. It reads what it needs from the
  * repo (package.json scripts, tools/build.mjs, the git remote); anything that
@@ -52,6 +56,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 
 import { SEMVER, repoSlug } from "./build.mjs";
@@ -150,6 +155,24 @@ export function compatAnswer(answer, current, pattern) {
 /** The systems to ask about: release.config.json's list, else the ones module.json names. */
 export function systemIds(manifest, configured) {
   return configured ?? (manifest.relationships?.systems ?? []).map((s) => s.id);
+}
+
+/**
+ * True if module.json differs from the committed one in anything besides
+ * what a release writes: the version, compatibility and system ranges.
+ */
+export function otherManifestChanges(committed, current) {
+  const strip = (manifest) => {
+    const copy = structuredClone(manifest ?? {});
+    delete copy.version;
+    delete copy.compatibility;
+    if (copy.relationships) {
+      delete copy.relationships.systems;
+      if (!Object.keys(copy.relationships).length) delete copy.relationships;
+    }
+    return copy;
+  };
+  return !isDeepStrictEqual(strip(committed), strip(current));
 }
 
 const orderedCompat = (compat) =>
@@ -453,10 +476,13 @@ async function main(argv) {
   const manifest = readJson("module.json") ?? fail("No module.json at the repo root.");
 
   // Release exactly what's on GitHub, so the tag matches what was tested. The
-  // notes file may have uncommitted drafting; it's committed with the release.
+  // notes file may have uncommitted drafting, and module.json the version and
+  // ranges a dry run wrote; both are committed with the release.
   if (!quiet("gh auth status")) fail("GitHub CLI isn't signed in. Run: gh auth login");
   if (read("git", ["branch", "--show-current"]) !== cfg.branch) fail(`Switch to ${cfg.branch} first.`);
-  const dirty = read("git", ["diff", "--name-only", "HEAD"]).split("\n").filter((path) => path && path !== cfg.notes);
+  const committed = JSON.parse(tryRead("git", ["show", "HEAD:module.json"]) || "{}");
+  const dirty = read("git", ["diff", "--name-only", "HEAD"]).split("\n").filter((path) => path && path !== cfg.notes
+    && !(path === "module.json" && !otherManifestChanges(committed, manifest)));
   if (dirty.length) fail(`Commit or discard these first:\n  ${dirty.join("\n  ")}`);
   read("git", ["fetch", "--quiet", "--tags", "origin", cfg.branch]);
   if (read("git", ["rev-parse", "HEAD"]) !== read("git", ["rev-parse", `origin/${cfg.branch}`])) {
@@ -471,13 +497,14 @@ async function main(argv) {
       .map((line) => /refs\/tags\/v([^\^]+)$/.exec(line)?.[1]).filter(Boolean),
   );
   const latest = tryRead("gh", ["release", "view", "--json", "tagName", "--jq", ".tagName"]);
-  const base = baseVersion(latest, manifest.version);
+  // The committed version, so a dry run's version can be released as is.
+  const base = baseVersion(latest, committed.version);
 
   let version = choice && resolveVersion(choice, base);
   if (choice && !version) fail(`"${choice}" isn't patch, minor, major or a version like 1.2.3.`);
 
   if (!version) {
-    console.log(`\n${manifest.id}: latest release ${latest || "none"}, module.json ${manifest.version ?? "none"}`);
+    console.log(`\n${manifest.id}: latest release ${latest || "none"}, module.json ${committed.version ?? "none"}`);
     if (base) PARTS.forEach((p, i) => console.log(`  ${i + 1}) ${p.padEnd(5)}  v${bump(base, p)}`));
     const prompt = base ? "Choose 1-3, or type a version: " : "First release version (like 1.0.0): ";
     while (!version) {
@@ -495,20 +522,31 @@ async function main(argv) {
   if (released.has(version)) fail(`${tag} already exists on GitHub.`);
 
   // Ranges go in the same Release commit as the version. --yes keeps them as they are.
-  const compat = yes ? {} : await askCompatibility(manifest, systemIds(manifest, cfg.systems));
-  const compatChanged = JSON.stringify(setCompatibility(manifest, compat)) !== JSON.stringify(manifest);
-  const setWhat = compatChanged ? `module.json to ${version} with the new compatibility` : `module.json to ${version}`;
+  const systems = systemIds(manifest, cfg.systems);
+  const compat = yes ? {} : await askCompatibility(manifest, systems);
+  const next = setCompatibility(manifest, compat);
+  const ranges = [
+    `Foundry ${describeCompat(next.compatibility)}`,
+    ...systems.map((id) => `${id} ${describeCompat(next.relationships?.systems?.find((s) => s.id === id)?.compatibility)}`),
+  ].join("; ");
+
+  // Written before the checks so the build, and any local testing, use it.
+  // Only reformat module.json when a range changed; a version bump keeps its layout.
+  const manifestText = readText(manifestFile);
+  const withCompat = isDeepStrictEqual(next, manifest) ? manifestText : `${JSON.stringify(next, null, 2)}\n`;
+  writeText(manifestFile, setManifestVersion(withCompat, version), manifestText);
+  const kept = `module.json (${version}) and ${cfg.notes} keep their changes; the next run picks them up.`;
 
   if (cfg.verify) {
     console.log(`\n> ${cfg.verify}`);
-    if (!run(cfg.verify)) fail("Checks failed. Nothing released.");
+    if (!run(cfg.verify)) fail(`Checks failed. Nothing released. ${kept}`);
   } else console.warn("No verify command found; skipping checks.");
 
   // Same build the workflow runs; catches a bad manifest before anything changes.
   if (cfg.build) {
     const build = fill(cfg.build, version);
     console.log(`\n> ${build}`);
-    if (!run(build)) fail("Build failed. Nothing released.");
+    if (!run(build)) fail(`Build failed. Nothing released. ${kept}`);
   }
 
   const lastTag = base ? (base.startsWith("v") ? base : `v${base}`) : "";
@@ -518,23 +556,17 @@ async function main(argv) {
   console.log(notes ? `\nNotes for ${tag}:\n${notes.replace(/^/gm, "  | ")}` : `\nNo notes for ${tag}; just the generated ones.`);
 
   if (dryRun) {
-    console.log(`\nDry run: would set ${setWhat}, commit "Release ${tag}", push and publish.`);
-    console.log(`${cfg.notes} keeps the "# ${tag}" section; the next run picks it up again.`);
+    console.log(`\nDry run: module.json is set to ${version} (${ranges}) and dist/ is built from it.`);
+    console.log(`Nothing committed, pushed or published. ${kept}`);
     return;
   }
 
-  const question = `\nSet ${setWhat}, commit "Release ${tag}", push to ${cfg.branch} and publish? [y/N] `;
+  const question = `\nCommit "Release ${tag}" (${ranges}), push to ${cfg.branch} and publish? [y/N] `;
   if (!yes && (await ask(question)).toLowerCase() !== "y") {
-    console.log(`Cancelled. Your notes are saved in ${cfg.notes}.`);
+    console.log(`Cancelled. ${kept}`);
     return;
   }
 
-  const manifestText = readText(manifestFile);
-  // Only reformat module.json when a range changed; a version bump keeps its layout.
-  const withCompat = compatChanged
-    ? `${JSON.stringify(setCompatibility(JSON.parse(manifestText), compat), null, 2)}\n`
-    : manifestText;
-  writeText(manifestFile, setManifestVersion(withCompat, version), manifestText);
   if (!git("add", "--", "module.json", cfg.notes) || !git("commit", "-m", `Release ${tag}`)) {
     fail("Commit failed. module.json and the notes are changed but not committed; nothing released.");
   }

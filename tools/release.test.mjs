@@ -5,7 +5,7 @@ import {
   bump, compareVersions, baseVersion, resolveVersion, fill, setManifestVersion,
   parseNotes, draftNotes, finishNotes, releaseBody, pickEditor, config, MANIFEST_MARKER,
   parseCommits, formatCommits, describeCompat, compatAnswer, systemIds, setCompatibility,
-  FOUNDRY_VERSION, SYSTEM_VERSION,
+  FOUNDRY_VERSION, SYSTEM_VERSION, otherManifestChanges,
 } from "./release.mjs";
 
 test("bump raises the chosen part and resets the ones below it", () => {
@@ -244,4 +244,21 @@ test("setCompatibility drops cleared fields and leaves untouched entries as they
   const cleared = setCompatibility({ relationships: { systems: [{ id: "dnd5e", compatibility: { minimum: "6" } }] } },
     { systems: { dnd5e: {} } });
   assert.deepEqual(cleared.relationships.systems, [{ id: "dnd5e" }], "still requires the system, no version range");
+});
+
+test("otherManifestChanges ignores what a dry run writes and catches anything else", () => {
+  const head = {
+    id: "x", version: "1.0.0", compatibility: { minimum: "13" },
+    relationships: { requires: [{ id: "lib-wrapper" }] }, styles: ["a.css"],
+  };
+  const dryRun = {
+    id: "x", version: "1.1.0", compatibility: { minimum: "14", verified: "14.367" },
+    relationships: { requires: [{ id: "lib-wrapper" }], systems: [{ id: "dnd5e", compatibility: { minimum: "6.1.0" } }] },
+    styles: ["a.css"],
+  };
+  assert.equal(otherManifestChanges(head, dryRun), false);
+  assert.equal(otherManifestChanges({ id: "x" }, { relationships: { systems: [] }, id: "x" }), false, "new relationships block");
+  assert.equal(otherManifestChanges(head, { ...dryRun, styles: [{ src: "a.css" }] }), true, "Foundry's rewrite");
+  assert.equal(otherManifestChanges(head, { ...dryRun, relationships: { systems: [] } }), true, "requires dropped");
+  assert.equal(otherManifestChanges(head, head), false);
 });
