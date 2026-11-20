@@ -192,8 +192,11 @@
   "TOKEN-HUD.hover-menus-hint": "Resting the pointer on a HUD menu button (such as status effects) opens its menu after half a second. Off means menus open on click, as in Foundry's default.",
   "TOKEN-HUD.focus-hp-name": "Focus HP on Token Right Click",
   "TOKEN-HUD.focus-hp-hint": "When the HUD opens, put the cursor in the HP box with its value selected so you can type a new number right away. The GM hover HP tab does this whether or not this is on.",
+  "TOKEN-HUD.multi-select-name": "Apply HUD Changes to All Selected Tokens",
+  "TOKEN-HUD.multi-select-hint": "With several tokens selected, a status or movement action picked in the HUD applies to all of them. A number on the status and movement buttons shows how many will change. Concentration still applies only to the token you clicked.",
   "TOKEN-HUD.hover-shortcut-name": "GM Hover HP Shortcut",
   "TOKEN-HUD.hover-shortcut-hint": "When the GM hovers a token, a small HP tab shows at its bottom right corner. Clicking it opens the full HUD. Has no effect for players.",
   "TOKEN-HUD.conflict-custom-dnd5e": "DMM Token HUD is off because Custom D&D 5e's Token HUD Improvements is also on. Turn it off in Game Settings → Configure Settings → Custom D&D 5e → Configure Interface → Token HUD Improvements, then reload.",
+  "TOKEN-HUD.conflict-custom-dnd5e-multi-select": "DMM's Apply HUD Changes to All Selected Tokens is off because Custom D&D 5e's Toggle Status Effects on Selected is also on. Turn that off in Game Settings → Configure Settings → Custom D&D 5e → Configure Interface → Tokens, then reload.",
   "TOKEN-HUD.conflict-illandril": "DMM Token HUD is off because Illandril's Token HUD Scale is also active. Disable it in Game Settings → Manage Modules, then reload."
 }

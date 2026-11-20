@@ -38,12 +38,13 @@ Works with [Bar Brawl](https://gitlab.com/woodentavern/foundryvtt-bar-brawl): th
 | **Smallest Size When Zoomed Out** | Smallest size the HUD can shrink to when zoomed out, as a % of its full size. Default is 85%. |
 | **1×1 HUD** | Uses a 1x1 token size as the baseline for the HUD instead of the full token size. Mostly makes it easier to use with large tokens. |
 | **GM Hover HP Shortcut** | When the GM hovers a token, a small HP tab shows at its bottom right corner. Clicking it opens the full HUD. |
+| **Apply HUD Changes to All Selected Tokens** | With several tokens selected, a status or movement action picked in the HUD applies to all of them. A number on the status and movement buttons shows how many will change. Exhaustion goes up or down one level on each; concentration stays on the token you clicked. |
 
 I recommend the following settings in Custom D&D 5e:
 - Configure Interface
   - Radial Status Effects → Radial Status Effects on
   - Tokens → Apply Elevation to Selected on
-  - Tokens → Toggle Status Effects on Selected on
+  - Tokens → Toggle Status Effects on Selected off (this module's Apply HUD Changes to All Selected Tokens replaces it)
   - Token Border → Enable, Circle, Thickness 4, do not scale with token.
   - Token Distance → On, Player
   - Token HUD → Token HUD Improvements off (improved in this module)

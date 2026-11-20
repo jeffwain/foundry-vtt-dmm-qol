@@ -118,6 +118,31 @@ function fitPalette(el, area) {
   applied.set(el, { tx: dx ? tx : 0, ty: dy ? ty : 0, capped });
 }
 
+/* Temporary: Bases (Bugbear's Status Sorter) writes its own translate on its
+   status palette in a later frame, which knocks ours off and makes the menu
+   jump. Put ours back whenever it does. Observer callbacks run before paint,
+   so its value never shows. Remove once Bases leaves the position alone. */
+const BASES_PALETTE = "#token-hud.bases-hud-enabled .palette.status-effects";
+// Our translate as the browser reads it back (it may round), so comparing it can't loop.
+const basesOurs = new WeakMap();
+const basesObserver = new MutationObserver((records) => {
+  for (const { target: el } of records) {
+    const last = applied.get(el);
+    if (!last || !basesOurs.has(el) || !el.classList.contains("active")) continue;
+    if (el.style.translate === basesOurs.get(el)) continue;
+    el.style.translate = last.tx || last.ty ? `${last.tx}px ${last.ty}px` : "";
+    // Bases may also have changed the height, so fit again from our offset.
+    fitPalette(el, visibleArea());
+    basesOurs.set(el, el.style.translate);
+  }
+});
+
+function guardBasesTranslate(el) {
+  if (!el.matches(BASES_PALETTE)) return;
+  if (!basesOurs.has(el)) basesObserver.observe(el, { attributes: true, attributeFilter: ["style"] });
+  basesOurs.set(el, el.style.translate);
+}
+
 function anyHudRendered() {
   const huds = canvas?.hud;
   return Boolean(huds && (huds.token?.rendered || huds.tile?.rendered || huds.drawing?.rendered));
@@ -130,7 +155,10 @@ export function fitOpenPalettes() {
   const palettes = hud.querySelectorAll(OPEN_PALETTES);
   if (!palettes.length) return;
   const area = visibleArea();
-  for (const el of palettes) fitPalette(el, area);
+  for (const el of palettes) {
+    fitPalette(el, area);
+    guardBasesTranslate(el);
+  }
 }
 
 let observed = null;

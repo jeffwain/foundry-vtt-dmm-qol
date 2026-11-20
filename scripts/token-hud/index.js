@@ -2,14 +2,16 @@
  * Token HUD — replaces Illandril's Token HUD Scale for v14.
  *
  * Scales the placeable HUDs partway with zoom and keeps their parts outside the
- * token (scale.js), pins HUD menus inside the visible canvas (palettes.js), and
- * gives the GM a hover HP tab that opens the HUD (hover.js).
+ * token (scale.js), pins HUD menus inside the visible canvas (palettes.js),
+ * gives the GM a hover HP tab that opens the HUD (hover.js), and copies status
+ * and movement changes to every selected token (multi-select.js).
  */
 
 import { registerSettings, getHudSettings } from "./settings.js";
 import { startScaling, writeHudVars, rerenderOpenHuds } from "./scale.js";
 import { startPalettes } from "./palettes.js";
 import { startHover } from "./hover.js";
+import { startMultiSelect } from "./multi-select.js";
 
 let conflictWarned = false;
 
@@ -27,6 +29,16 @@ export function scalingConflict() {
     return "TOKEN-HUD.conflict-custom-dnd5e";
   }
   return null;
+}
+
+/**
+ * Custom D&D 5e's "Toggle Status Effects on Selected" copies statuses too.
+ * With both on, exhaustion would go up twice per click and both would race to
+ * create the same effect, so ours stands aside. Its setting reloads on change.
+ */
+function multiSelectConflict() {
+  const key = "custom-dnd5e.toggle-status-effect-on-selected-tokens";
+  return game.settings.settings.has(key) && game.settings.get("custom-dnd5e", "toggle-status-effect-on-selected-tokens");
 }
 
 function refreshAll() {
@@ -50,4 +62,9 @@ Hooks.once("ready", () => {
   }
   startPalettes();
   startHover();
+  if (!multiSelectConflict()) {
+    startMultiSelect(() => getHudSettings().multiSelect);
+  } else if (game.user.isGM && getHudSettings().multiSelect) {
+    ui.notifications.warn(game.i18n.localize("TOKEN-HUD.conflict-custom-dnd5e-multi-select"));
+  }
 });

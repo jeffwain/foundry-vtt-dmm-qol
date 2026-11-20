@@ -56,6 +56,15 @@
   }
 }
 
+/* stylelint-disable-next-line selector-max-specificity -- must beat Bases' own ID rule */
+:where(#hud.dmm-hud-scaled) #token-hud.bases-hud-enabled .col .status-effects {
+  /* ── Token HUD - Bugbear's Status Sorter ───────────────────────────────── */
+  /* Bases already sizes its status list to a fixed size on screen, so undo
+     the column scale above or the list is scaled twice. Its own rule is
+     ID-scoped, hence the ID here. */
+  --bases-hud-scale: calc(var(--bases-current-hud-scale, 1) / var(--dmm-hud-factor, 1));
+}
+
 :where(#hud) .placeable-hud {
   /* ── Token HUD - Palettes ──────────────────────────────────────────────── */
   /* palettes.js pins open palettes inside the canvas, often over the HUD's
@@ -102,5 +111,31 @@
 
   &:hover {
     border-color: #a6ff2e;
+  }
+}
+
+:where(#hud) .placeable-hud {
+  /* ── Token HUD - Selected Token Count ──────────────────────────────────── */
+  /* multi-select.js puts this on the status and movement buttons when a
+     change there will apply to every selected token. */
+  .control-icon:has(> .dmm-hud-multi-count) {
+    position: relative;
+  }
+
+  .dmm-hud-multi-count {
+    position: absolute;
+    inset-block-start: -0.375rem;
+    inset-inline-start: -0.375rem;
+    min-inline-size: 1rem;
+    padding-inline: 0.1875rem;
+    border: 1px solid var(--color-light-3, #bbb);
+    border-radius: 0.5rem;
+    background: var(--color-cool-5, #0b0a13);
+    color: var(--color-light-1, #fff);
+    font-size: 0.625rem;
+    font-weight: 700;
+    line-height: 0.875rem;
+    text-align: center;
+    pointer-events: none;
   }
 }

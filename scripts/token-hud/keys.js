@@ -10,6 +10,7 @@ export const KEYS = {
   HOVER: "token-hud-hover-shortcut",
   HOVER_MENUS: "token-hud-hover-menus",
   FOCUS_HP: "token-hud-focus-hp",
+  MULTI_SELECT: "token-hud-multi-select",
   // A player's own size overrides, keyed by the size setting keys above.
   USER: "token-hud-user",
 };

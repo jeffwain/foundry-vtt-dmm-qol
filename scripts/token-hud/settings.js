@@ -41,6 +41,7 @@ function readSettings() {
     hover: get(KEYS.HOVER),
     hoverMenus: get(KEYS.HOVER_MENUS),
     focusHp: get(KEYS.FOCUS_HP),
+    multiSelect: get(KEYS.MULTI_SELECT),
   };
   return cached;
 }
@@ -55,7 +56,7 @@ class TokenHudSettings extends SettingsGroupDialog {
 
   get settingKeys() {
     if (game.user.isGM) {
-      return [KEYS.ENABLED, ...SIZE_KEYS, KEYS.ONE_BY_ONE, KEYS.HOVER_MENUS, KEYS.HOVER, KEYS.FOCUS_HP];
+      return [KEYS.ENABLED, ...SIZE_KEYS, KEYS.ONE_BY_ONE, KEYS.HOVER_MENUS, KEYS.HOVER, KEYS.FOCUS_HP, KEYS.MULTI_SELECT];
     }
     return game.settings.get(MODULE, KEYS.ENABLED) ? SIZE_KEYS : [];
   }
@@ -138,6 +139,7 @@ export function registerSettings(onChange) {
   boolean(KEYS.HOVER_MENUS, "hover-menus", true);
   boolean(KEYS.HOVER, "hover-shortcut", true);
   boolean(KEYS.FOCUS_HP, "focus-hp", true);
+  boolean(KEYS.MULTI_SELECT, "multi-select", true);
 
   // A player's own size overrides.
   game.settings.register(MODULE, KEYS.USER, {
@@ -150,7 +152,7 @@ export function registerSettings(onChange) {
   // No read here: game.user is still null during init. getHudSettings reads on first use.
 }
 
-/** @returns {{enabled: boolean, buttonScale: number, response: number, floor: number, oneByOne: boolean, hover: boolean, hoverMenus: boolean, focusHp: boolean}} */
+/** @returns {{enabled: boolean, buttonScale: number, response: number, floor: number, oneByOne: boolean, hover: boolean, hoverMenus: boolean, focusHp: boolean, multiSelect: boolean}} */
 export function getHudSettings() {
   return cached ?? readSettings();
 }
