@@ -1,3 +1,8 @@
+# v1.1.3
+
+- Apply Token HUD status and movement changes to all selected tokens
+- Avoids conflicts with most other token HUD modules
+
 # v1.1.2
 
 - Improve the build process!
