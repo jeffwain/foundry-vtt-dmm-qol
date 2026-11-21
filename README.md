@@ -40,6 +40,8 @@ Works with [Bar Brawl](https://gitlab.com/woodentavern/foundryvtt-bar-brawl): th
 | **GM Hover HP Shortcut** | When the GM hovers a token, a small HP tab shows at its bottom right corner. Clicking it opens the full HUD. |
 | **Apply HUD Changes to All Selected Tokens** | With several tokens selected, a status or movement action picked in the HUD applies to all of them. A number on the status and movement buttons shows how many will change. Exhaustion goes up or down one level on each; concentration stays on the token you clicked. |
 
+The status menu gets a **Clear** button (to the right of Bugbear's Status Sorter's filter box, if you use it) that removes every status except stacked ones (exhaustion, Drakkenheim's contamination) and concentration. It clears every selected token when Apply HUD Changes to All Selected Tokens is on. If Monk's Little Details' Clear All or the Status Sorter's Clear Effects is on, that button does this instead. Ctrl (Cmd) click a stacked status to take a level off. A help icon at the left of that row lists the click shortcuts when you hover it.
+
 I recommend the following settings in Custom D&D 5e:
 - Configure Interface
   - Radial Status Effects → Radial Status Effects on

@@ -6,7 +6,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { affectedActors, affectedTokens, statusChange } from "./multi-select.js";
+import { affectedActors, affectedTokens, hasStatusLevel, statusChange, stepStatusLevel } from "./multi-select.js";
 
 const goblin = { name: "goblin" };
 const orc = { name: "orc" };
@@ -83,4 +83,51 @@ test("statusChange steps levels, and a decrease only touches actors that have it
 
 test("statusChange leaves concentration to the clicked token", () => {
   assert.equal(statusChange({ statusId: "concentrating", rightClick: false, wasActive: false, hasLevels: false }), null);
+});
+
+test("statusChange takes a level off on a Ctrl (Cmd) click", () => {
+  assert.deepEqual(statusChange({ statusId: "exhaustion", rightClick: false, reduce: true, wasActive: true, hasLevels: true }), {
+    options: { levels: -1 },
+    onlyIfHas: true,
+  });
+});
+
+test("statusChange ignores Ctrl on a status without levels", () => {
+  assert.deepEqual(statusChange({ statusId: "prone", rightClick: false, reduce: true, wasActive: false, hasLevels: false }).options, {
+    active: true,
+    overlay: false,
+  });
+});
+
+function fakeActor({ statuses = [], contamination } = {}) {
+  const calls = [];
+  const actor = {
+    calls,
+    statuses: new Set(statuses),
+    toggleStatusEffect: (id, options) => calls.push(["toggle", id, options]),
+  };
+  if (contamination !== undefined) {
+    actor.currentContamination = contamination;
+    actor.adjustContamination = (delta) => calls.push(["contamination", delta]);
+  }
+  return actor;
+}
+
+// Drakkenheim's contamination is a number on the actor; dnd5e's level code would add a stray effect.
+test("stepStatusLevel changes Drakkenheim contamination through its own method", () => {
+  const actor = fakeActor({ contamination: 2 });
+  stepStatusLevel(actor, "contamination", -1);
+  assert.deepEqual(actor.calls, [["contamination", -1]]);
+});
+
+test("stepStatusLevel uses dnd5e levels for other stacked statuses", () => {
+  const actor = fakeActor({ statuses: ["exhaustion"], contamination: 0 });
+  stepStatusLevel(actor, "exhaustion", 1);
+  assert.deepEqual(actor.calls, [["toggle", "exhaustion", { levels: 1 }]]);
+});
+
+test("hasStatusLevel reads the contamination count, not the actor's statuses", () => {
+  assert.equal(hasStatusLevel(fakeActor({ contamination: 0 }), "contamination"), false);
+  assert.equal(hasStatusLevel(fakeActor({ contamination: 3 }), "contamination"), true);
+  assert.equal(hasStatusLevel(fakeActor({ statuses: ["exhaustion"] }), "exhaustion"), true);
 });

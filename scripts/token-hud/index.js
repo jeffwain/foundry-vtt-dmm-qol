@@ -3,8 +3,10 @@
  *
  * Scales the placeable HUDs partway with zoom and keeps their parts outside the
  * token (scale.js), pins HUD menus inside the visible canvas (palettes.js),
- * gives the GM a hover HP tab that opens the HUD (hover.js), and copies status
- * and movement changes to every selected token (multi-select.js).
+ * gives the GM a hover HP tab that opens the HUD (hover.js), copies status
+ * and movement changes to every selected token (multi-select.js), and adds a
+ * Clear button, a reduce-level shortcut and a hint to the status menu
+ * (status-menu.js).
  */
 
 import { registerSettings, getHudSettings } from "./settings.js";
@@ -12,6 +14,7 @@ import { startScaling, writeHudVars, rerenderOpenHuds } from "./scale.js";
 import { startPalettes } from "./palettes.js";
 import { startHover } from "./hover.js";
 import { startMultiSelect } from "./multi-select.js";
+import { startStatusMenu } from "./status-menu.js";
 
 let conflictWarned = false;
 
@@ -67,4 +70,5 @@ Hooks.once("ready", () => {
   } else if (game.user.isGM && getHudSettings().multiSelect) {
     ui.notifications.warn(game.i18n.localize("TOKEN-HUD.conflict-custom-dnd5e-multi-select"));
   }
+  startStatusMenu();
 });

@@ -49,33 +49,59 @@ export function affectedTokens(controlled, hudToken) {
 
 /**
  * What to do to the other actors for one status click.
- * @param {{statusId: string, rightClick: boolean, wasActive: boolean, hasLevels: boolean}} click
- *   wasActive is the clicked token's state before the HUD acted.
+ * @param {{statusId: string, rightClick: boolean, reduce?: boolean, wasActive: boolean, hasLevels: boolean}} click
+ *   wasActive is the clicked token's state before the HUD acted. reduce is a
+ *   Ctrl (Cmd) click, which takes a level off like a right click.
  * @returns {{options: object, onlyIfHas: boolean}|null} toggleStatusEffect options, or null to skip.
  */
-export function statusChange({ statusId, rightClick, wasActive, hasLevels }) {
+export function statusChange({ statusId, rightClick, reduce = false, wasActive, hasLevels }) {
   if (!statusId || SKIPPED_STATUSES.has(statusId)) return null;
   // dnd5e falls back to a plain toggle when there is no level to remove, which
   // would add the status, so a decrease only touches actors that have it.
-  if (hasLevels) return { options: { levels: rightClick ? -1 : 1 }, onlyIfHas: rightClick };
+  if (hasLevels) {
+    const down = rightClick || reduce;
+    return { options: { levels: down ? -1 : 1 }, onlyIfHas: down };
+  }
   // Set each actor to the clicked token's new state rather than flipping each one.
   return { options: { active: !wasActive, overlay: rightClick }, onlyIfHas: false };
 }
 
-/** dnd5e marks statuses with levels (exhaustion) in its condition config. */
-function statusHasLevels(statusId) {
+/** dnd5e marks statuses with levels (exhaustion, Drakkenheim's contamination) in its condition config. */
+export function statusHasLevels(statusId) {
   return Number.isFinite(CONFIG.DND5E?.conditionTypes?.[statusId]?.levels);
 }
 
-function hudToken(hud) {
+/** Drakkenheim keeps contamination as a number on the actor, not an effect, and changes it with its own method. */
+function usesContaminationCount(actor, statusId) {
+  return statusId === "contamination" && typeof actor?.adjustContamination === "function";
+}
+
+/** Whether an actor has at least one level of a stacked status. */
+export function hasStatusLevel(actor, statusId) {
+  if (usesContaminationCount(actor, statusId)) return (actor.currentContamination ?? 0) > 0;
+  return Boolean(actor?.statuses?.has(statusId));
+}
+
+/** Add or remove levels of a stacked status. */
+export function stepStatusLevel(actor, statusId, delta) {
+  if (usesContaminationCount(actor, statusId)) return actor.adjustContamination(delta);
+  return actor.toggleStatusEffect(statusId, { levels: delta });
+}
+
+export function hudToken(hud) {
   return hud.object ?? null;
 }
 
-function controlledTokens() {
+export function controlledTokens() {
   return canvas?.tokens?.controlled ?? [];
 }
 
-function reportFailures(results) {
+/** Whether HUD changes go to every selected token. */
+export function multiSelectOn() {
+  return isOn();
+}
+
+export function reportFailures(results) {
   for (const result of results) {
     if (result.status === "rejected") console.error("dmm-quality-of-life | multi-token HUD change failed", result.reason);
   }
@@ -90,14 +116,19 @@ function onStatusClick(hud, event) {
   const change = statusChange({
     statusId,
     rightClick: event.button === 2,
+    reduce: event.ctrlKey || event.metaKey,
     wasActive: button.classList.contains("active"),
     hasLevels: statusHasLevels(statusId),
   });
   if (!change) return;
   const { others } = affectedActors(controlledTokens(), hudToken(hud));
-  const targets = change.onlyIfHas ? others.filter((actor) => actor.statuses?.has(statusId)) : others;
+  const targets = change.onlyIfHas ? others.filter((actor) => hasStatusLevel(actor, statusId)) : others;
   if (!targets.length) return;
-  Promise.allSettled(targets.map((actor) => actor.toggleStatusEffect(statusId, change.options))).then(reportFailures);
+  const { levels } = change.options;
+  const apply = levels === undefined
+    ? (actor) => actor.toggleStatusEffect(statusId, change.options)
+    : (actor) => stepStatusLevel(actor, statusId, levels);
+  Promise.allSettled(targets.map(async (actor) => apply(actor))).then(reportFailures);
 }
 
 function onMovementClick(hud, event) {
